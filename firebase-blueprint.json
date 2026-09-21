@@ -1,0 +1,59 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with personal stats and transfer preferences",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "savedPackagesCount": { "type": "number" },
+        "totalTransfers": { "type": "number" },
+        "isProLicensed": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "TransferPackage": {
+      "title": "TransferPackage",
+      "description": "A saved transfer package cloud snapshot created by user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileCount": { "type": "number" },
+        "totalSize": { "type": "number" },
+        "isSingleFile": { "type": "boolean" },
+        "isBypassActive": { "type": "boolean" },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "size": { "type": "number" },
+              "type": { "type": "string" },
+              "isText": { "type": "boolean" },
+              "content": { "type": "string" }
+            }
+          }
+        },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "files", "createdAt"]
+    }
+  },
+  "rules": {
+    "packages": {
+      "$packageId": {
+        ".read": "true",
+        ".write": "true"
+      }
+    }
+  }
+}

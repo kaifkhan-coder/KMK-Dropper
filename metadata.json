@@ -1,0 +1,6 @@
+{
+  "name": "Multi-File ZIP Package Generator via QR",
+  "description": "Desktop Java GUI application for compressing queued files into watermarked ZIP archives and instantly transferring them to mobile devices via dynamic QR codes over local Wi-Fi.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
