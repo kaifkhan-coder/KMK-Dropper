@@ -114,7 +114,7 @@ export const WatermarkDashboard: React.FC<WatermarkDashboardProps> = ({
                 type={showPassword ? 'text' : 'password'}
                 value={codeInput}
                 onChange={(e) => setCodeInput(e.target.value)}
-                placeholder='Enter coupon code ()...'
+                placeholder="Enter bypass authorization key..."
                 autoComplete="off"
                 className="w-full pl-9 pr-10 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
               />

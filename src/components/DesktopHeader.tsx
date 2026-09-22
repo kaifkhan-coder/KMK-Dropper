@@ -10,6 +10,7 @@ interface DesktopHeaderProps {
   onExportJavaProject: () => void;
   onOpenCloudVault?: () => void;
   cloudPackagesCount?: number;
+  onOpenLegalModal?: (tab: 'terms' | 'privacy' | 'author' | 'spec') => void;
 }
 
 export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
@@ -20,7 +21,8 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
   serverRunning,
   onExportJavaProject,
   onOpenCloudVault,
-  cloudPackagesCount = 0
+  cloudPackagesCount = 0,
+  onOpenLegalModal
 }) => {
   return (
     <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-30">
@@ -52,9 +54,24 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
             </span>
           </div>
           <span className="text-slate-700">•</span>
-          <div className="text-slate-300">
-            Author: <span className="text-amber-300 font-semibold">Khan Kaif</span>
-          </div>
+          <button
+            onClick={() => onOpenLegalModal?.('author')}
+            className="text-slate-300 hover:text-amber-300 transition"
+          >
+            Author: <span className="text-amber-300 font-semibold underline decoration-dotted">Khan Mohammed Kaif</span>
+          </button>
+
+          {onOpenLegalModal && (
+            <>
+              <span className="text-slate-700">•</span>
+              <button
+                onClick={() => onOpenLegalModal('terms')}
+                className="text-slate-400 hover:text-slate-200 transition text-[11px]"
+              >
+                Terms & Privacy
+              </button>
+            </>
+          )}
 
           {onOpenCloudVault && (
             <>

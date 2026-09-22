@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { UploadCloud, FileCode, FileText, FileSpreadsheet, File, Trash2, Eye, Plus, Sparkles, AlertCircle, QrCode, FileCheck, CloudUpload } from 'lucide-react';
+import { UploadCloud, FileCode, FileText, FileSpreadsheet, File, Trash2, Eye, Plus, Sparkles, AlertCircle, QrCode, FileCheck, CloudUpload, Box } from 'lucide-react';
 import { QueuedFile } from '../types';
-import { isTextFile } from '../utils/watermark';
+import { isTextFile, is3DAnimationAsset } from '../utils/watermark';
 import { INITIAL_SAMPLE_FILES } from '../utils/sampleFiles';
 
 interface DropZoneAndFileListProps {
@@ -129,6 +129,12 @@ export const DropZoneAndFileList: React.FC<DropZoneAndFileListProps> = ({
 
   const getFileIcon = (fileName: string, isText: boolean) => {
     const ext = fileName.split('.').pop()?.toLowerCase();
+    if (ext === 'kaif') {
+      return <Sparkles className="w-4 h-4 text-amber-300" />;
+    }
+    if (is3DAnimationAsset(fileName)) {
+      return <Box className="w-4 h-4 text-cyan-400" />;
+    }
     if (ext === 'java' || ext === 'py' || ext === 'js' || ext === 'ts' || ext === 'cpp') {
       return <FileCode className="w-4 h-4 text-emerald-400" />;
     }

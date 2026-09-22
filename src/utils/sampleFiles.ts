@@ -74,5 +74,57 @@ if __name__ == "__main__":
     print("Grade Analysis Summary:", compute_grade_metrics(sample_scores))`,
     addedAt: new Date(Date.now() - 1000 * 60 * 1),
     status: 'staged'
+  },
+  {
+    id: 'file-4',
+    name: 'KinematicRig_WalkCycle.kaif',
+    size: 1240,
+    type: 'text/x-kaif-script',
+    extension: 'kaif',
+    isText: true,
+    content: `# [KMKaif Studio Animation Script]
+ANIMATION_CLIP: WalkCycle_60fps
+FPS: 60
+ROOT_BONE: Hips_Master
+KEYFRAMES:
+  frame_0:   { pos: [0.0, 0.95, 0.0], rot: [0.0, 0.0, 0.0] }
+  frame_15:  { pos: [0.0, 0.98, 0.12], rot: [2.5, 0.0, -1.2] }
+  frame_30:  { pos: [0.0, 0.94, 0.25], rot: [0.0, 0.0, 0.0] }
+  frame_45:  { pos: [0.0, 0.98, 0.38], rot: [-2.5, 0.0, 1.2] }
+  frame_60:  { pos: [0.0, 0.95, 0.50], rot: [0.0, 0.0, 0.0] }
+INTERPOLATION: HermiteCubicSpline
+LOOP_BEHAVIOR: RepeatSeamless`,
+    addedAt: new Date(Date.now() - 1000 * 45),
+    status: 'staged'
+  },
+  {
+    id: 'file-5',
+    name: 'CharacterGeometry_Hero.obj',
+    size: 2480,
+    type: 'model/obj',
+    extension: 'obj',
+    isText: true,
+    content: `# Wavefront 3D OBJ - Exported from Khan Kaif 3D Suite
+# Geometric Vertices
+v 0.000000 1.000000 0.000000
+v -1.000000 -1.000000 1.000000
+v 1.000000 -1.000000 1.000000
+v 1.000000 -1.000000 -1.000000
+v -1.000000 -1.000000 -1.000000
+# Vertex Normals
+vn 0.000000 1.000000 0.000000
+vn 0.000000 0.000000 1.000000
+vn 1.000000 0.000000 0.000000
+vn 0.000000 0.000000 -1.000000
+vn -1.000000 0.000000 0.000000
+# Polygonal Faces
+f 1//1 2//2 3//2
+f 1//1 3//3 4//3
+f 1//1 4//4 5//4
+f 1//1 5//5 2//5
+f 2//2 5//5 4//4
+f 4//4 3//3 2//2`,
+    addedAt: new Date(Date.now() - 1000 * 20),
+    status: 'staged'
   }
 ];

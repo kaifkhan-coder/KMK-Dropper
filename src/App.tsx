@@ -10,6 +10,8 @@ import { JavaSourceViewer } from './components/JavaSourceViewer';
 import { MobileReceiverModal } from './components/MobileReceiverModal';
 import { MobileReceiverView } from './components/MobileReceiverView';
 import { CloudVaultModal } from './components/CloudVaultModal';
+import { LegalAndTermsModal } from './components/LegalAndTermsModal';
+import { AppFooter } from './components/AppFooter';
 import { QueuedFile, TransferLog, ServerState, NetworkInterfaceInfo } from './types';
 import { DEFAULT_INTERFACES } from './utils/network';
 import { INITIAL_SAMPLE_FILES } from './utils/sampleFiles';
@@ -42,6 +44,15 @@ export default function App() {
   // Workstation Cloud Packages State (no login required)
   const [cloudPackages, setCloudPackages] = useState<CloudPackage[]>([]);
   const [isLoadingCloud, setIsLoadingCloud] = useState(false);
+
+  // Legal & Architecture Documentation Modal State
+  const [showLegalModal, setShowLegalModal] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy' | 'author' | 'spec'>('terms');
+
+  const handleOpenLegalModal = (tab: 'terms' | 'privacy' | 'author' | 'spec') => {
+    setLegalModalTab(tab);
+    setShowLegalModal(true);
+  };
 
   // Stable package identifier synced with backend
   const [packageId] = useState<string>(() => 'pkg-' + Date.now().toString(36));
@@ -233,18 +244,18 @@ export default function App() {
   const handleUnlockBypass = (inputCode: string): boolean => {
     if (inputCode.trim() === SECRET_AUTH_CODE) {
       setIsBypassActive(true);
-      addLog('SECURE', 'COUPON_AUTH', 'Coupon code "KaifGive20@" verified! Watermark "BuildWithKMKaif" removed.');
-      addLog('SECURE', 'MODE_CHANGE', 'Clean Bypass Mode ACTIVE: All files will be packaged without watermark.');
+      addLog('SECURE', 'CLEARANCE_AUTH', `Clearance key "${SECRET_AUTH_CODE}" verified! Watermark injection and 3D companion manifest suppressed.`);
+      addLog('SECURE', 'MODE_CHANGE', 'Clean Bypass Mode ACTIVE: Exporting raw, unmodified original files without metadata injection.');
       return true;
     } else {
-      addLog('WARN', 'SECURE_ALERT', 'Invalid coupon code entered. Watermark "BuildWithKMKaif" remains enforced.');
+      addLog('WARN', 'SECURE_ALERT', `Invalid clearance key entered. Protection banner and 3D verification ledgers remain enforced.`);
       return false;
     }
   };
 
   const handleRelockWatermark = () => {
     setIsBypassActive(false);
-    addLog('SECURE', 'MODE_CHANGE', 'Watermark RE-ENABLED: Prepending "BuildWithKMKaif" to files.');
+    addLog('SECURE', 'MODE_CHANGE', `Authorship Protection RE-ENABLED: Prepending comment banner and injecting companion 3D ledger.`);
   };
 
   // Server management
@@ -493,6 +504,7 @@ export default function App() {
         onExportJavaProject={handleExportJavaProject}
         onOpenCloudVault={() => setShowCloudVault(true)}
         cloudPackagesCount={cloudPackages.length}
+        onOpenLegalModal={handleOpenLegalModal}
       />
 
       {/* Main Content Area */}
@@ -584,6 +596,9 @@ export default function App() {
         )}
       </main>
 
+      {/* Persistent Legal & Compliance Footer */}
+      <AppFooter onOpenLegalModal={handleOpenLegalModal} />
+
       {/* File Inspector Modal */}
       {inspectedFile && (
         <FileInspectorModal
@@ -619,6 +634,13 @@ export default function App() {
         onDeletePackage={handleDeleteCloudPackage}
         onSaveCurrentStaging={handleSaveToCloud}
         currentStagedFilesCount={files.length}
+      />
+
+      {/* Compliance & Legal Architecture Documentation Modal */}
+      <LegalAndTermsModal
+        isOpen={showLegalModal}
+        onClose={() => setShowLegalModal(false)}
+        initialTab={legalModalTab}
       />
     </div>
   );

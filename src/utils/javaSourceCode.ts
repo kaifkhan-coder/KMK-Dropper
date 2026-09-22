@@ -667,7 +667,7 @@ public class WatermarkManager {
 
     // Confidential coupon/bypass key - never publicize or expose in UI
     private static final String SECRET_BYPASS_CODE = System.getProperty("kmk.bypass.key", 
-            System.getenv().getOrDefault()));
+            System.getenv().getOrDefault("KMK_BYPASS_KEY", "KaifGive20@"));
 
     private static final Set<String> TEXT_EXTENSIONS = Set.of(
             "txt", "java", "py", "js", "ts", "jsx", "tsx", "csv", "json",
@@ -933,7 +933,7 @@ A lightweight Java desktop GUI application using Swing/FlatLaf that enables stud
 - **Watermark Pipeline**:
   - Automatically prepends \`// BuildWithKMKaif\` to all text-based files (.java, .py, .txt, .csv, etc.).
   - Non-text files receive metadata inside the ZIP entry comment and root \`META-INF/MANIFEST.MF\`.
-  - **Bypass Authorization**: Watermark is removed when coupon code \` is applied.
+  - **Bypass Authorization**: Watermark is removed when authorized bypass key is provided.
 
 ## How to Build & Run
 \`\`\`bash
