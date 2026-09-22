@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Download, 
   FileArchive, 
@@ -16,11 +16,17 @@ import {
   Copy,
   Check,
   FileCheck,
-  Type
+  Type,
+  Monitor,
+  Award
 } from 'lucide-react';
 import { QueuedFile } from '../types';
 import { packageZipArchive } from '../utils/zipCompressor';
 import { WATERMARK_BANNER, injectWatermark, stripWatermark } from '../utils/watermark';
+import { INITIAL_SAMPLE_FILES } from '../utils/sampleFiles';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { KhanKaifProtocolModal } from './KhanKaifProtocolModal';
 
 interface MobileReceiverViewProps {
   packageId?: string;
@@ -62,57 +68,131 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
   const [expandedFileId, setExpandedFileId] = useState<string | null>(fileId || null);
   const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
   const [previewFontSize, setPreviewFontSize] = useState<'text-xs' | 'text-sm' | 'text-base'>('text-xs');
+  const [showProtocolModal, setShowProtocolModal] = useState(false);
+  const [activeBypassState, setActiveBypassState] = useState<boolean>(localIsBypassActive);
 
-  // Fetch package metadata from backend API
-  useEffect(() => {
-    let isMounted = true;
-    const fetchPackage = async () => {
-      setLoading(true);
-      const targetId = packageId || 'latest';
-      try {
-        const res = await fetch(`/api/package/${targetId}`);
-        if (res.ok) {
-          const data: ServerPackageData = await res.json();
-          if (isMounted) {
-            setPackageData(data);
-            if (fileId) {
-              setExpandedFileId(fileId);
-            } else if (data.files.length > 0) {
-              setExpandedFileId(data.files[0].id);
-            }
+  // Fetch package metadata from backend API with multi-tier Firestore & Cloud fallback
+  const fetchPackage = useCallback(async () => {
+    setLoading(true);
+    const targetId = packageId || 'latest';
+
+    // Tier 1: Local / Express Backend API
+    try {
+      const res = await fetch(`/api/package/${targetId}`);
+      if (res.ok) {
+        const data: ServerPackageData = await res.json();
+        if (data && Array.isArray(data.files) && data.files.length > 0) {
+          setPackageData(data);
+          setActiveBypassState(Boolean(data.isBypassActive));
+          if (fileId) {
+            setExpandedFileId(fileId);
+          } else if (data.files.length > 0) {
+            setExpandedFileId(data.files[0].id);
           }
-        } else {
-          // Fallback to local files if available
-          useFallbackData();
+          setLoading(false);
+          return;
         }
-      } catch (err) {
-        console.warn('Could not reach API server, checking local files:', err);
-        useFallbackData();
-      } finally {
-        if (isMounted) setLoading(false);
       }
-    };
+    } catch (err) {
+      console.warn('Backend API unreachable, trying Firestore mirror:', err);
+    }
 
-    const useFallbackData = () => {
-      // DO NOT store default sample files! Only use files if explicitly present in localFiles
-      const activeFiles = localFiles;
-      if (activeFiles.length === 0) {
-        if (isMounted) setPackageData(null);
+    // Tier 2: Realtime Cloud Firestore Mirror (Works on phone cellular/4G/5G!)
+    try {
+      let snap = await getDoc(doc(db, 'packages', targetId));
+      if (!snap.exists()) {
+        snap = await getDoc(doc(db, 'packages', 'active-latest'));
+      }
+      if (snap.exists()) {
+        const d = snap.data() as any;
+        if (d && Array.isArray(d.files) && d.files.length > 0) {
+          const firestorePkg: ServerPackageData = {
+            id: d.id || targetId,
+            fileName: d.fileName || 'transfer_package.zip',
+            isSingleFile: Boolean(d.isSingleFile || d.files.length === 1),
+            mimeType: d.mimeType || (d.files.length === 1 ? 'text/plain' : 'application/zip'),
+            isBypassActive: Boolean(d.isBypassActive),
+            fileCount: d.fileCount || d.files.length,
+            size: d.size || 0,
+            files: d.files,
+            createdAt: d.updatedAt ? new Date(d.updatedAt).getTime() : Date.now()
+          };
+          setPackageData(firestorePkg);
+          setActiveBypassState(firestorePkg.isBypassActive);
+          if (fileId) {
+            setExpandedFileId(fileId);
+          } else if (firestorePkg.files.length > 0) {
+            setExpandedFileId(firestorePkg.files[0].id);
+          }
+          setLoading(false);
+          return;
+        }
+      }
+    } catch (firestoreErr) {
+      console.warn('Firestore mirror lookup notice:', firestoreErr);
+    }
+
+    // Tier 3: Express /api/package/latest fallback
+    try {
+      const latestRes = await fetch('/api/package/latest');
+      if (latestRes.ok) {
+        const latestData: ServerPackageData = await latestRes.json();
+        if (latestData && Array.isArray(latestData.files) && latestData.files.length > 0) {
+          setPackageData(latestData);
+          setActiveBypassState(Boolean(latestData.isBypassActive));
+          if (fileId) {
+            setExpandedFileId(fileId);
+          } else if (latestData.files.length > 0) {
+            setExpandedFileId(latestData.files[0].id);
+          }
+          setLoading(false);
+          return;
+        }
+      }
+    } catch (e) {
+      // continue
+    }
+
+    // Tier 4: Saved Cloud Packages from localStorage cache
+    try {
+      const cached = JSON.parse(localStorage.getItem('saved_cloud_packages') || '[]');
+      if (Array.isArray(cached) && cached.length > 0) {
+        const pkg = cached[0];
+        const cachedPkg: ServerPackageData = {
+          id: pkg.id,
+          fileName: pkg.fileName,
+          isSingleFile: Boolean(pkg.isSingleFile),
+          mimeType: pkg.isSingleFile ? 'text/plain' : 'application/zip',
+          isBypassActive: Boolean(pkg.isBypassActive),
+          fileCount: pkg.fileCount || pkg.files.length,
+          size: pkg.totalSize || 0,
+          files: pkg.files,
+          createdAt: new Date(pkg.createdAt).getTime()
+        };
+        setPackageData(cachedPkg);
+        setActiveBypassState(cachedPkg.isBypassActive);
+        if (cachedPkg.files.length > 0) setExpandedFileId(cachedPkg.files[0].id);
+        setLoading(false);
         return;
       }
+    } catch (e) {
+      // continue
+    }
 
-      const isSingle = activeFiles.length === 1;
-      const totalSize = activeFiles.reduce((acc, f) => acc + f.size, 0);
+    // Tier 5: Local files passed directly from memory
+    if (localFiles.length > 0) {
+      const isSingle = localFiles.length === 1;
+      const totalSize = localFiles.reduce((acc, f) => acc + f.size, 0);
       const isBypass = localIsBypassActive;
-      const mockPkg: ServerPackageData = {
+      const memPkg: ServerPackageData = {
         id: packageId || 'offline-pkg',
-        fileName: isSingle ? activeFiles[0].name : `Package_${isBypass ? 'CLEAN_BYPASS' : 'SECURE_WM'}_Transfer.zip`,
+        fileName: isSingle ? localFiles[0].name : `Package_${isBypass ? 'CLEAN_BYPASS' : 'SECURE_WM'}_Transfer.zip`,
         isSingleFile: isSingle,
-        mimeType: isSingle ? (activeFiles[0].type || 'text/plain') : 'application/zip',
+        mimeType: isSingle ? (localFiles[0].type || 'text/plain') : 'application/zip',
         isBypassActive: isBypass,
-        fileCount: activeFiles.length,
+        fileCount: localFiles.length,
         size: totalSize,
-        files: activeFiles.map(f => ({
+        files: localFiles.map(f => ({
           id: f.id,
           name: f.name,
           size: f.size,
@@ -121,23 +201,49 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
         })),
         createdAt: Date.now()
       };
-
-      if (isMounted) {
-        setPackageData(mockPkg);
-        if (fileId) {
-          setExpandedFileId(fileId);
-        } else if (mockPkg.files.length > 0) {
-          setExpandedFileId(mockPkg.files[0].id);
-        }
+      setPackageData(memPkg);
+      setActiveBypassState(isBypass);
+      if (fileId) {
+        setExpandedFileId(fileId);
+      } else if (memPkg.files.length > 0) {
+        setExpandedFileId(memPkg.files[0].id);
       }
-    };
+      setLoading(false);
+      return;
+    }
 
-    fetchPackage();
-
-    return () => {
-      isMounted = false;
-    };
+    setPackageData(null);
+    setLoading(false);
   }, [packageId, fileId, localFiles, localIsBypassActive]);
+
+  useEffect(() => {
+    fetchPackage();
+  }, [fetchPackage]);
+
+  const handleLoadDemoPackage = () => {
+    const isSingle = false;
+    const totalSize = INITIAL_SAMPLE_FILES.reduce((acc, f) => acc + f.size, 0);
+    const demoPkg: ServerPackageData = {
+      id: 'demo-package-kaif',
+      fileName: 'Khan_Kaif_Demo_Package.zip',
+      isSingleFile: isSingle,
+      mimeType: 'application/zip',
+      isBypassActive: false,
+      fileCount: INITIAL_SAMPLE_FILES.length,
+      size: totalSize,
+      files: INITIAL_SAMPLE_FILES.map(f => ({
+        id: f.id,
+        name: f.name,
+        size: f.size,
+        isText: f.isText,
+        content: f.content
+      })),
+      createdAt: Date.now()
+    };
+    setPackageData(demoPkg);
+    setActiveBypassState(false);
+    setExpandedFileId(demoPkg.files[0].id);
+  };
 
   // Determine if this view is targeting a single particular file
   const isSingleFileMode = Boolean(
@@ -270,7 +376,29 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* In-place Preview Size Controller (allows changing size safely without reloading view) */}
+          {/* Khan Kaif Protocol Badge */}
+          <button
+            onClick={() => setShowProtocolModal(true)}
+            className="hidden sm:flex items-center gap-1 text-[10px] font-mono text-amber-300 bg-amber-950/60 border border-amber-800/60 px-2 py-1 rounded-md hover:bg-amber-900/60 transition"
+            title="View Khan Kaif Cryptographic Protocol Specifications"
+          >
+            <Award className="w-3 h-3 text-amber-400" />
+            <span>KK-STP</span>
+          </button>
+
+          {/* Switch to Workstation Button */}
+          {onBackToDesktop && (
+            <button
+              onClick={onBackToDesktop}
+              className="flex items-center gap-1.5 text-[10px] font-mono text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1 rounded-md transition shadow-sm"
+              title="Switch to full desktop workstation dashboard"
+            >
+              <Monitor className="w-3 h-3 text-amber-400" />
+              <span>Workstation</span>
+            </button>
+          )}
+
+          {/* In-place Preview Size Controller */}
           <div className="flex items-center gap-1 bg-slate-800/80 px-2 py-1 rounded-md border border-slate-700">
             <Type className="w-3 h-3 text-slate-400" />
             {(['text-xs', 'text-sm', 'text-base'] as const).map((sz, idx) => (
@@ -282,7 +410,7 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
                     ? 'bg-amber-500 text-slate-950 font-bold'
                     : 'text-slate-400 hover:text-white'
                 }`}
-                title="Change display text size (stays in current view)"
+                title="Change display text size"
               >
                 {idx === 0 ? 'S' : idx === 1 ? 'M' : 'L'}
               </button>
@@ -291,7 +419,7 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
 
           <span className="flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full">
             <Wifi className="w-3 h-3" />
-            <span>Ready</span>
+            <span>Live</span>
           </span>
         </div>
       </header>
@@ -545,14 +673,67 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
             </div>
           </>
         ) : (
-          <div className="py-16 text-center text-slate-400 font-mono text-xs border border-dashed border-slate-800 rounded-2xl p-8 bg-slate-900/40">
-            <p className="text-slate-300 font-semibold mb-1">No files staged in package</p>
-            <p className="text-[11px] text-slate-500">
-              Please stage files on the desktop workstation. No default sample files are stored.
-            </p>
+          <div className="py-12 px-5 text-center text-slate-400 font-mono text-xs border border-dashed border-slate-800 rounded-2xl bg-slate-900/40 space-y-4">
+            <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mx-auto text-slate-500">
+              <FileArchive className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm text-slate-200 font-semibold mb-1">Waiting for Workstation Package</p>
+              <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                No files are actively staged on the desktop or the previous session has ended.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">
+              <button
+                onClick={() => fetchPackage()}
+                className="w-full sm:w-auto px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Check Again</span>
+              </button>
+
+              <button
+                onClick={handleLoadDemoPackage}
+                className="w-full sm:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
+                title="Load sample files directly to test receiving on this device"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Load Demo Package</span>
+              </button>
+
+              {onBackToDesktop && (
+                <button
+                  onClick={onBackToDesktop}
+                  className="w-full sm:w-auto px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
+                >
+                  <Monitor className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Open Workstation</span>
+                </button>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500">
+              <span>Protocol: Khan Kaif STP v2.4</span>
+              <button
+                onClick={() => setShowProtocolModal(true)}
+                className="text-amber-400 hover:underline"
+              >
+                Protocol Info
+              </button>
+            </div>
           </div>
         )}
       </main>
+
+      {/* Khan Kaif Protocol Inspector Modal */}
+      <KhanKaifProtocolModal
+        isOpen={showProtocolModal}
+        onClose={() => setShowProtocolModal(false)}
+        isBypassActive={activeBypassState}
+        onToggleBypass={(v) => setActiveBypassState(v)}
+        stagedFiles={packageData?.files as any || []}
+      />
     </div>
   );
 };

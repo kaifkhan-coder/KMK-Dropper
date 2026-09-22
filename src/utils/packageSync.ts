@@ -1,6 +1,8 @@
 import { QueuedFile } from '../types';
 import { packageZipArchive } from './zipCompressor';
 import { injectWatermark, stripWatermark } from './watermark';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export interface SyncPackageResult {
   success: boolean;
@@ -90,6 +92,32 @@ export async function syncActivePackageToServer(
     })),
     fileBase64
   };
+
+  // Mirror to Firestore for cross-network and mobile phone direct access
+  try {
+    const firestorePackage = {
+      id: packageId,
+      fileName,
+      mimeType,
+      isSingleFile,
+      isBypassActive,
+      size: payloadBlob.size,
+      fileCount: files.length,
+      files: files.map(f => ({
+        id: f.id,
+        name: f.name,
+        size: f.size,
+        type: f.type || (f.isText ? 'text/plain' : 'application/octet-stream'),
+        isText: f.isText,
+        content: f.isText ? (isBypassActive ? stripWatermark(f.content || '') : injectWatermark(f.content || '')) : undefined
+      })),
+      updatedAt: new Date().toISOString()
+    };
+    await setDoc(doc(db, 'packages', packageId), firestorePackage);
+    await setDoc(doc(db, 'packages', 'active-latest'), firestorePackage);
+  } catch (firestoreErr) {
+    console.warn('Firestore cloud mirror notice:', firestoreErr);
+  }
 
   const response = await fetch('/api/package', {
     method: 'POST',

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import JSZip from 'jszip';
+import { Smartphone } from 'lucide-react';
 import { DesktopHeader } from './components/DesktopHeader';
 import { WatermarkDashboard } from './components/WatermarkDashboard';
 import { DropZoneAndFileList } from './components/DropZoneAndFileList';
@@ -10,8 +11,6 @@ import { JavaSourceViewer } from './components/JavaSourceViewer';
 import { MobileReceiverModal } from './components/MobileReceiverModal';
 import { MobileReceiverView } from './components/MobileReceiverView';
 import { CloudVaultModal } from './components/CloudVaultModal';
-import { LegalAndTermsModal } from './components/LegalAndTermsModal';
-import { AppFooter } from './components/AppFooter';
 import { QueuedFile, TransferLog, ServerState, NetworkInterfaceInfo } from './types';
 import { DEFAULT_INTERFACES } from './utils/network';
 import { INITIAL_SAMPLE_FILES } from './utils/sampleFiles';
@@ -26,16 +25,36 @@ import {
   deleteUserPackage,
   getWorkspaceId
 } from './utils/cloudSync';
+import { KhanKaifProtocolModal } from './components/KhanKaifProtocolModal';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'gui' | 'java-source' | 'mobile'>('gui');
-  // Do NOT store default files: Start with clean empty staging queue
-  const [files, setFiles] = useState<QueuedFile[]>([]);
+  // Staging queue: restore from localStorage if user previously staged files
+  const [files, setFiles] = useState<QueuedFile[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem('qr_staged_files_cache');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((f: any) => ({
+            ...f,
+            addedAt: new Date(f.addedAt || Date.now())
+          }));
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+    return [];
+  });
+
   const [selectedQrFileId, setSelectedQrFileId] = useState<string | null>(null);
   const [isBypassActive, setIsBypassActive] = useState(false);
   const [inspectedFile, setInspectedFile] = useState<QueuedFile | null>(null);
   const [showMobileModal, setShowMobileModal] = useState(false);
   const [showCloudVault, setShowCloudVault] = useState(false);
+  const [showKhanKaifModal, setShowKhanKaifModal] = useState(false);
   const [isPackaging, setIsPackaging] = useState(false);
   const [isSyncingServer, setIsSyncingServer] = useState(false);
   const [progressPercent, setProgressPercent] = useState(100);
@@ -45,24 +64,43 @@ export default function App() {
   const [cloudPackages, setCloudPackages] = useState<CloudPackage[]>([]);
   const [isLoadingCloud, setIsLoadingCloud] = useState(false);
 
-  // Legal & Architecture Documentation Modal State
-  const [showLegalModal, setShowLegalModal] = useState(false);
-  const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy' | 'author' | 'spec'>('terms');
-
-  const handleOpenLegalModal = (tab: 'terms' | 'privacy' | 'author' | 'spec') => {
-    setLegalModalTab(tab);
-    setShowLegalModal(true);
-  };
-
   // Stable package identifier synced with backend
   const [packageId] = useState<string>(() => 'pkg-' + Date.now().toString(36));
 
-  // Detect if opened from a physical mobile device scan (?mobile=1)
+  // Detect if opened from a physical mobile device scan (?mobile=1, ?pkg=..., or mobile user agent)
   const [isMobileDeviceView, setIsMobileDeviceView] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const params = new URLSearchParams(window.location.search);
-    return params.get('mobile') === '1' || window.location.pathname.startsWith('/mobile');
+    const hasScanQuery = params.get('mobile') === '1' || params.has('pkg') || params.has('fileId');
+    const isMobilePath = window.location.pathname.startsWith('/mobile') || window.location.pathname.startsWith('/download');
+    const isMobileScreen = window.innerWidth < 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    return hasScanQuery || isMobilePath || isMobileScreen;
   });
+
+  // Sync staged files to localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (files.length > 0) {
+        const serializable = files.map(f => ({
+          id: f.id,
+          name: f.name,
+          size: f.size,
+          type: f.type,
+          extension: f.extension,
+          isText: f.isText,
+          content: f.content,
+          addedAt: f.addedAt,
+          status: f.status
+        }));
+        localStorage.setItem('qr_staged_files_cache', JSON.stringify(serializable));
+      } else {
+        localStorage.removeItem('qr_staged_files_cache');
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [files]);
 
   const [mobileParamPkgId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -244,18 +282,18 @@ export default function App() {
   const handleUnlockBypass = (inputCode: string): boolean => {
     if (inputCode.trim() === SECRET_AUTH_CODE) {
       setIsBypassActive(true);
-      addLog('SECURE', 'CLEARANCE_AUTH', `Clearance key "${SECRET_AUTH_CODE}" verified! Watermark injection and 3D companion manifest suppressed.`);
-      addLog('SECURE', 'MODE_CHANGE', 'Clean Bypass Mode ACTIVE: Exporting raw, unmodified original files without metadata injection.');
+      addLog('SECURE', 'COUPON_AUTH', 'Coupon code "KaifGive20@" verified! Watermark "BuildWithKMKaif" removed.');
+      addLog('SECURE', 'MODE_CHANGE', 'Clean Bypass Mode ACTIVE: All files will be packaged without watermark.');
       return true;
     } else {
-      addLog('WARN', 'SECURE_ALERT', `Invalid clearance key entered. Protection banner and 3D verification ledgers remain enforced.`);
+      addLog('WARN', 'SECURE_ALERT', 'Invalid coupon code entered. Watermark "BuildWithKMKaif" remains enforced.');
       return false;
     }
   };
 
   const handleRelockWatermark = () => {
     setIsBypassActive(false);
-    addLog('SECURE', 'MODE_CHANGE', `Authorship Protection RE-ENABLED: Prepending comment banner and injecting companion 3D ledger.`);
+    addLog('SECURE', 'MODE_CHANGE', 'Watermark RE-ENABLED: Prepending "BuildWithKMKaif" to files.');
   };
 
   // Server management
@@ -488,12 +526,13 @@ export default function App() {
         fileId={mobileParamFileId}
         localFiles={files}
         localIsBypassActive={isBypassActive}
+        onBackToDesktop={() => setIsMobileDeviceView(false)}
       />
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-black">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-black relative">
       {/* Desktop Window Header */}
       <DesktopHeader
         activeTab={activeTab}
@@ -504,8 +543,19 @@ export default function App() {
         onExportJavaProject={handleExportJavaProject}
         onOpenCloudVault={() => setShowCloudVault(true)}
         cloudPackagesCount={cloudPackages.length}
-        onOpenLegalModal={handleOpenLegalModal}
+        onOpenKhanKaifModal={() => setShowKhanKaifModal(true)}
       />
+
+      {/* Floating Mobile Switcher for Mobile Device Users */}
+      <div className="fixed bottom-4 right-4 z-30 lg:hidden">
+        <button
+          onClick={() => setIsMobileDeviceView(true)}
+          className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-full shadow-xl flex items-center gap-2 text-xs font-mono transition border border-amber-300"
+        >
+          <Smartphone className="w-4 h-4" />
+          <span>Switch to Mobile View</span>
+        </button>
+      </div>
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-5">
@@ -596,9 +646,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Persistent Legal & Compliance Footer */}
-      <AppFooter onOpenLegalModal={handleOpenLegalModal} />
-
       {/* File Inspector Modal */}
       {inspectedFile && (
         <FileInspectorModal
@@ -636,11 +683,19 @@ export default function App() {
         currentStagedFilesCount={files.length}
       />
 
-      {/* Compliance & Legal Architecture Documentation Modal */}
-      <LegalAndTermsModal
-        isOpen={showLegalModal}
-        onClose={() => setShowLegalModal(false)}
-        initialTab={legalModalTab}
+      {/* Remarkable Creation: Khan Kaif Cryptographic Protocol Suite & Inspector Modal */}
+      <KhanKaifProtocolModal
+        isOpen={showKhanKaifModal}
+        onClose={() => setShowKhanKaifModal(false)}
+        isBypassActive={isBypassActive}
+        onToggleBypass={(activate) => {
+          if (activate) {
+            handleUnlockBypass(SECRET_AUTH_CODE);
+          } else {
+            handleRelockWatermark();
+          }
+        }}
+        stagedFiles={files}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 
 interface StoredPackage {
@@ -21,6 +22,61 @@ interface StoredPackage {
 
 const packagesMap = new Map<string, StoredPackage>();
 let latestPackageId: string | null = null;
+const CACHE_FILE_PATH = '/tmp/qr_packages_store.json';
+
+function saveStoreToDisk() {
+  try {
+    const list: any[] = [];
+    for (const [, val] of packagesMap.entries()) {
+      list.push({
+        id: val.id,
+        fileName: val.fileName,
+        mimeType: val.mimeType,
+        isSingleFile: val.isSingleFile,
+        isBypassActive: val.isBypassActive,
+        files: val.files,
+        fileBase64: val.fileBuffer.toString('base64'),
+        createdAt: val.createdAt
+      });
+    }
+    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify({ latestPackageId, packages: list }));
+  } catch (e) {
+    console.warn('[API] Could not save store to disk:', e);
+  }
+}
+
+function loadStoreFromDisk() {
+  try {
+    if (fs.existsSync(CACHE_FILE_PATH)) {
+      const data = JSON.parse(fs.readFileSync(CACHE_FILE_PATH, 'utf-8'));
+      if (Array.isArray(data.packages)) {
+        for (const item of data.packages) {
+          packagesMap.set(item.id, {
+            id: item.id,
+            fileName: item.fileName,
+            mimeType: item.mimeType,
+            isSingleFile: item.isSingleFile,
+            isBypassActive: item.isBypassActive,
+            files: item.files || [],
+            fileBuffer: Buffer.from(item.fileBase64 || '', 'base64'),
+            createdAt: item.createdAt || Date.now()
+          });
+        }
+      }
+      if (data.latestPackageId && packagesMap.has(data.latestPackageId)) {
+        latestPackageId = data.latestPackageId;
+      } else if (packagesMap.size > 0) {
+        latestPackageId = Array.from(packagesMap.keys())[packagesMap.size - 1];
+      }
+      console.log(`[API] Restored ${packagesMap.size} package(s) from disk cache. Latest: ${latestPackageId}`);
+    }
+  } catch (e) {
+    console.warn('[API] Could not load store from disk:', e);
+  }
+}
+
+// Initial restore on server boot
+loadStoreFromDisk();
 
 async function startServer() {
   const app = express();
@@ -66,6 +122,7 @@ async function startServer() {
 
       packagesMap.set(id, newPackage);
       latestPackageId = id;
+      saveStoreToDisk();
 
       // Keep map size reasonable (max 20 packages)
       if (packagesMap.size > 20) {
@@ -94,27 +151,22 @@ async function startServer() {
 
   // Get package metadata (for mobile receiver UI)
   app.get('/api/package/:id', (req, res) => {
-    const targetId = req.params.id === 'latest' ? latestPackageId : req.params.id;
-    if (!targetId || !packagesMap.has(targetId)) {
-      if (latestPackageId && packagesMap.has(latestPackageId)) {
-        const fallbackPkg = packagesMap.get(latestPackageId)!;
-        return res.json({
-          id: fallbackPkg.id,
-          fileName: fallbackPkg.fileName,
-          isSingleFile: fallbackPkg.isSingleFile,
-          mimeType: fallbackPkg.mimeType,
-          isBypassActive: fallbackPkg.isBypassActive,
-          fileCount: fallbackPkg.files.length,
-          size: fallbackPkg.fileBuffer.length,
-          files: fallbackPkg.files,
-          createdAt: fallbackPkg.createdAt,
-          isLatestFallback: true
-        });
-      }
+    let targetId = req.params.id;
+    let pkg: StoredPackage | undefined = undefined;
+
+    if (targetId && targetId !== 'latest' && packagesMap.has(targetId)) {
+      pkg = packagesMap.get(targetId);
+    } else if (latestPackageId && packagesMap.has(latestPackageId)) {
+      pkg = packagesMap.get(latestPackageId);
+    } else if (packagesMap.size > 0) {
+      const allPkgs = Array.from(packagesMap.values());
+      pkg = allPkgs[allPkgs.length - 1];
+    }
+
+    if (!pkg) {
       return res.status(404).json({ error: 'Package not found or expired' });
     }
 
-    const pkg = packagesMap.get(targetId)!;
     res.json({
       id: pkg.id,
       fileName: pkg.fileName,
@@ -131,8 +183,12 @@ async function startServer() {
   // Download a specific file by fileId
   app.get('/api/download/:id/:fileId', (req, res) => {
     const { id, fileId } = req.params;
-    const targetId = id === 'latest' || !id ? latestPackageId : id;
-    const pkg = targetId ? packagesMap.get(targetId) : null;
+    let targetId = id === 'latest' || !id ? latestPackageId : id;
+    let pkg = targetId && packagesMap.has(targetId) ? packagesMap.get(targetId) : (latestPackageId ? packagesMap.get(latestPackageId) : null);
+    if (!pkg && packagesMap.size > 0) {
+      const allPkgs = Array.from(packagesMap.values());
+      pkg = allPkgs[allPkgs.length - 1];
+    }
 
     if (!pkg) {
       return res.status(404).send('Package not found.');
@@ -171,8 +227,12 @@ async function startServer() {
 
   // Download endpoint (Serves original file if single file, or ZIP if multi-file)
   const handleDownload = (req: express.Request, res: express.Response) => {
-    const targetId = req.params.id === 'latest' || !req.params.id ? latestPackageId : req.params.id;
-    const pkg = targetId ? packagesMap.get(targetId) : (latestPackageId ? packagesMap.get(latestPackageId) : null);
+    let targetId = req.params.id === 'latest' || !req.params.id ? latestPackageId : req.params.id;
+    let pkg = targetId && packagesMap.has(targetId) ? packagesMap.get(targetId) : (latestPackageId ? packagesMap.get(latestPackageId) : null);
+    if (!pkg && packagesMap.size > 0) {
+      const allPkgs = Array.from(packagesMap.values());
+      pkg = allPkgs[allPkgs.length - 1];
+    }
 
     if (!pkg) {
       return res.status(404).send('No active file or package available for download. Please stage files on desktop.');
