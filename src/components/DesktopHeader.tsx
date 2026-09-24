@@ -1,5 +1,5 @@
 import React from 'react';
-import { Coffee, Shield, Terminal, Smartphone, Download, HardDrive, Cloud, Award } from 'lucide-react';
+import { Coffee, Shield, Terminal, Smartphone, Download, HardDrive, Cloud, Award, FileText, Key, Unlock, Lock } from 'lucide-react';
 
 interface DesktopHeaderProps {
   activeTab: 'gui' | 'java-source' | 'mobile';
@@ -11,6 +11,10 @@ interface DesktopHeaderProps {
   onOpenCloudVault?: () => void;
   cloudPackagesCount?: number;
   onOpenKhanKaifModal?: () => void;
+  onOpenTermsModal?: (tab: 'terms' | 'privacy' | '3d-protocol' | 'architect') => void;
+  isDevUnlocked: boolean;
+  onOpenDevUnlockModal: () => void;
+  onRelockDevMode?: () => void;
 }
 
 export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
@@ -22,7 +26,11 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
   onExportJavaProject,
   onOpenCloudVault,
   cloudPackagesCount = 0,
-  onOpenKhanKaifModal
+  onOpenKhanKaifModal,
+  onOpenTermsModal,
+  isDevUnlocked,
+  onOpenDevUnlockModal,
+  onRelockDevMode
 }) => {
   return (
     <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-30">
@@ -111,21 +119,23 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
             </span>
           </button>
 
-          <button
-            id="tab-java-source"
-            onClick={() => setActiveTab('java-source')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-medium text-xs transition-all ${
-              activeTab === 'java-source'
-                ? 'bg-amber-500 text-slate-950 shadow-md font-semibold shadow-amber-500/20'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            <Coffee className="w-4 h-4" />
-            <span>Java Source Code Suite</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-amber-300 border border-slate-700">
-              7 Files + POM
-            </span>
-          </button>
+          {isDevUnlocked && (
+            <button
+              id="tab-java-source"
+              onClick={() => setActiveTab('java-source')}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-medium text-xs transition-all ${
+                activeTab === 'java-source'
+                  ? 'bg-amber-500 text-slate-950 shadow-md font-semibold shadow-amber-500/20'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <Coffee className="w-4 h-4 text-amber-400" />
+              <span>Java Source Code Suite</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-amber-300 border border-slate-700 font-mono">
+                Unlocked
+              </span>
+            </button>
+          )}
 
           <button
             id="tab-mobile-preview"
@@ -141,26 +151,64 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
           </button>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          {/* Secret Code Unlock / Dev Status Button */}
+          {isDevUnlocked ? (
+            <button
+              id="btn-dev-mode-active"
+              onClick={onOpenDevUnlockModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/80 rounded-lg text-xs font-mono transition"
+              title="Developer Suite Unlocked (KaifOmniMind447). Click to view status or relock."
+            >
+              <Unlock className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">Developer Unlocked:</span>
+              <span className="font-bold text-emerald-200">KaifOmniMind447</span>
+            </button>
+          ) : (
+            <button
+              id="btn-unlock-secret-code"
+              onClick={onOpenDevUnlockModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-xs font-mono transition shadow-sm"
+              title="Enter secret code (KaifOmniMind447) to unlock Java Source Code & developer suite"
+            >
+              <Key className="w-3.5 h-3.5" />
+              <span>Enter Secret Code</span>
+            </button>
+          )}
+
           {/* Security Badge in Header */}
-          <div className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs font-mono border ${
+          <div className={`flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-mono border ${
             isBypassActive 
               ? 'bg-emerald-950/70 border-emerald-600/60 text-emerald-300' 
               : 'bg-amber-950/60 border-amber-600/60 text-amber-300'
           }`}>
             <Shield className="w-3.5 h-3.5" />
-            <span>{isBypassActive ? 'BYPASS ACTIVE (Clean Export)' : 'WATERMARK ENFORCED'}</span>
+            <span className="hidden md:inline">{isBypassActive ? 'BYPASS ACTIVE' : 'WATERMARK ENFORCED'}</span>
           </div>
 
-          <button
-            id="btn-export-java-project"
-            onClick={onExportJavaProject}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-mono border border-slate-700 transition"
-            title="Download full Maven Java Project with source files, pom.xml, and FlatLaf setup"
-          >
-            <Download className="w-3.5 h-3.5 text-amber-400" />
-            <span>Export Java Project (.zip)</span>
-          </button>
+          {onOpenTermsModal && (
+            <button
+              id="btn-header-terms-privacy"
+              onClick={() => onOpenTermsModal('terms')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-400 rounded-lg text-xs font-mono border border-slate-700 transition"
+              title="Terms & Conditions, Privacy Policy & 3D Protocol Governance"
+            >
+              <FileText className="w-3.5 h-3.5 text-amber-400" />
+              <span>Terms</span>
+            </button>
+          )}
+
+          {isDevUnlocked && (
+            <button
+              id="btn-export-java-project"
+              onClick={onExportJavaProject}
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-mono border border-slate-700 transition"
+              title="Download full Maven Java Project with source files, pom.xml, and FlatLaf setup"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-400" />
+              <span>Export Java Project (.zip)</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Smartphone, Download, Wifi, ShieldCheck, FileArchive, CheckCircle2, RefreshCw, ExternalLink, Copy, Check } from 'lucide-react';
 import { QueuedFile } from '../types';
+import { getPublicUniversalUrl } from '../utils/urlHelper';
 
 interface MobileReceiverModalProps {
   files: QueuedFile[];
@@ -35,10 +36,8 @@ export const MobileReceiverModal: React.FC<MobileReceiverModalProps> = ({
 
   const totalBytes = files.reduce((acc, f) => acc + f.size, 0);
 
-  const publicOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-  const mobileWebUrl = `${publicOrigin}/?mobile=1&pkg=${encodeURIComponent(packageId)}${
-    targetedFile ? `&fileId=${encodeURIComponent(targetedFile.id)}` : ''
-  }`;
+  const fileParam = targetedFile ? `&fileId=${encodeURIComponent(targetedFile.id)}` : '';
+  const mobileWebUrl = getPublicUniversalUrl(`/?mobile=1&pkg=${encodeURIComponent(packageId)}${fileParam}`);
 
   const handleDownload = () => {
     onDownloadZip();

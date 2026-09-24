@@ -33,98 +33,123 @@ public class StudentRegistry {
   },
   {
     id: 'file-2',
-    name: 'LabNotes_BinaryTrees.txt',
-    size: 890,
-    type: 'text/plain',
-    extension: 'txt',
+    name: 'motion_rig.kaif',
+    size: 680,
+    type: 'application/x-kaif-script',
+    extension: 'kaif',
     isText: true,
-    content: `CS204 Data Structures & Algorithms
-Topic: Self-Balancing Binary Search Trees (AVL & Red-Black)
-
-Key Properties:
-1. Balance Factor = height(left) - height(right) must be in {-1, 0, 1}.
-2. Rotations required for insertion: Left-Left, Right-Right, Left-Right, Right-Left.
-3. Lookup time complexity guaranteed O(log N).
-
-Submission Deadline: Friday 23:59 via QR Package Receiver.`,
+    content: `# Khan Mohammed Kaif 3D Rigging Script
+rig.target = "Bipedal_Hero_Mesh"
+rig.inverse_kinematics = true
+rig.fps = 60
+rig.bake_keyframes([0, 12, 24, 48, 72])
+print("[KAIF 3D] Neural skeleton rig initialized successfully.")`,
     addedAt: new Date(Date.now() - 1000 * 60 * 3),
     status: 'staged'
   },
   {
     id: 'file-3',
-    name: 'GradeAnalysis.py',
-    size: 1180,
-    type: 'text/x-python',
-    extension: 'py',
-    isText: true,
-    content: `import statistics
-
-def compute_grade_metrics(scores):
-    mean_val = statistics.mean(scores)
-    median_val = statistics.median(scores)
-    std_dev = statistics.stdev(scores) if len(scores) > 1 else 0.0
-    return {
-        "mean": round(mean_val, 2),
-        "median": round(median_val, 2),
-        "std_dev": round(std_dev, 2)
-    }
-
-if __name__ == "__main__":
-    sample_scores = [88.5, 92.0, 79.5, 95.0, 84.0, 91.5]
-    print("Grade Analysis Summary:", compute_grade_metrics(sample_scores))`,
-    addedAt: new Date(Date.now() - 1000 * 60 * 1),
-    status: 'staged'
-  },
-  {
-    id: 'file-4',
-    name: 'KinematicRig_WalkCycle.kaif',
-    size: 1240,
-    type: 'text/x-kaif-script',
-    extension: 'kaif',
-    isText: true,
-    content: `# [KMKaif Studio Animation Script]
-ANIMATION_CLIP: WalkCycle_60fps
-FPS: 60
-ROOT_BONE: Hips_Master
-KEYFRAMES:
-  frame_0:   { pos: [0.0, 0.95, 0.0], rot: [0.0, 0.0, 0.0] }
-  frame_15:  { pos: [0.0, 0.98, 0.12], rot: [2.5, 0.0, -1.2] }
-  frame_30:  { pos: [0.0, 0.94, 0.25], rot: [0.0, 0.0, 0.0] }
-  frame_45:  { pos: [0.0, 0.98, 0.38], rot: [-2.5, 0.0, 1.2] }
-  frame_60:  { pos: [0.0, 0.95, 0.50], rot: [0.0, 0.0, 0.0] }
-INTERPOLATION: HermiteCubicSpline
-LOOP_BEHAVIOR: RepeatSeamless`,
-    addedAt: new Date(Date.now() - 1000 * 45),
-    status: 'staged'
-  },
-  {
-    id: 'file-5',
-    name: 'CharacterGeometry_Hero.obj',
-    size: 2480,
+    name: 'hero_character.obj',
+    size: 4520,
     type: 'model/obj',
     extension: 'obj',
     isText: true,
-    content: `# Wavefront 3D OBJ - Exported from Khan Kaif 3D Suite
-# Geometric Vertices
-v 0.000000 1.000000 0.000000
-v -1.000000 -1.000000 1.000000
-v 1.000000 -1.000000 1.000000
-v 1.000000 -1.000000 -1.000000
-v -1.000000 -1.000000 -1.000000
-# Vertex Normals
-vn 0.000000 1.000000 0.000000
-vn 0.000000 0.000000 1.000000
-vn 1.000000 0.000000 0.000000
-vn 0.000000 0.000000 -1.000000
-vn -1.000000 0.000000 0.000000
-# Polygonal Faces
-f 1//1 2//2 3//2
-f 1//1 3//3 4//3
-f 1//1 4//4 5//4
-f 1//1 5//5 2//5
-f 2//2 5//5 4//4
-f 4//4 3//3 2//2`,
-    addedAt: new Date(Date.now() - 1000 * 20),
+    content: `# Wavefront OBJ 3D Model
+# Architect: Khan Mohammed Kaif
+v -0.500000 -0.500000 0.500000
+v 0.500000 -0.500000 0.500000
+v -0.500000 0.500000 0.500000
+v 0.500000 0.500000 0.500000
+v -0.500000 0.500000 -0.500000
+v 0.500000 0.500000 -0.500000
+v -0.500000 -0.500000 -0.500000
+v 0.500000 -0.500000 -0.500000
+vn 0.0000 0.0000 1.0000
+vn 0.0000 1.0000 0.0000
+vn 0.0000 0.0000 -1.0000
+vn 0.0000 -1.0000 0.0000
+vn 1.0000 0.0000 0.0000
+vn -1.0000 0.0000 0.0000
+f 1//1 2//1 4//1 3//1
+f 3//2 4//2 6//2 5//2
+f 5//3 6//3 8//3 7//3
+f 7//4 8//4 2//4 1//4
+f 2//5 8//5 6//5 4//5
+f 7//6 1//6 3//6 5//6`,
+    binaryBlob: new Blob([
+      `# Wavefront OBJ 3D Model
+# Architect: Khan Mohammed Kaif
+v -0.500000 -0.500000 0.500000
+v 0.500000 -0.500000 0.500000
+v -0.500000 0.500000 0.500000
+v 0.500000 0.500000 0.500000
+v -0.500000 0.500000 -0.500000
+v 0.500000 0.500000 -0.500000
+v -0.500000 -0.500000 -0.500000
+v 0.500000 -0.500000 -0.500000
+vn 0.0000 0.0000 1.0000
+vn 0.0000 1.0000 0.0000
+vn 0.0000 0.0000 -1.0000
+vn 0.0000 -1.0000 0.0000
+vn 1.0000 0.0000 0.0000
+vn -1.0000 0.0000 0.0000
+f 1//1 2//1 4//1 3//1
+f 3//2 4//2 6//2 5//2
+f 5//3 6//3 8//3 7//3
+f 7//4 8//4 2//4 1//4
+f 2//5 8//5 6//5 4//5
+f 7//6 1//6 3//6 5//6`
+    ], { type: 'model/obj' }),
+    addedAt: new Date(Date.now() - 1000 * 60 * 2),
+    status: 'staged'
+  }
+];
+
+export const SAMPLE_3D_ANIMATION_FILES: QueuedFile[] = [
+  {
+    id: 'file-3d-1',
+    name: 'cyber_avatar.obj',
+    size: 2150,
+    type: 'model/obj',
+    extension: 'obj',
+    isText: false,
+    binaryBlob: new Blob([
+      `# 3D Avatar Mesh (OBJ Format)
+# Architect: Khan Mohammed Kaif 3D Animation Suite
+v 0.0 0.0 0.0
+v 1.0 0.0 0.0
+v 1.0 1.0 0.0
+v 0.0 1.0 0.0
+f 1 2 3 4`
+    ], { type: 'model/obj' }),
+    addedAt: new Date(),
+    status: 'staged'
+  },
+  {
+    id: 'file-3d-2',
+    name: 'armature_kinematics.blend',
+    size: 8940,
+    type: 'application/x-blender',
+    extension: 'blend',
+    isText: false,
+    binaryBlob: new Blob([
+      new Uint8Array([66, 76, 69, 78, 68, 69, 82, 45, 118, 51, 48, 48]) // BLENDER-v300 magic header
+    ], { type: 'application/x-blender' }),
+    addedAt: new Date(),
+    status: 'staged'
+  },
+  {
+    id: 'file-3d-3',
+    name: 'animation_rig.kaif',
+    size: 512,
+    type: 'application/x-kaif-script',
+    extension: 'kaif',
+    isText: true,
+    content: `# [KMK-3D] Rigging Script
+scene.active_rig = "Armature_Primary"
+ik_solver.tolerance = 0.001
+export_options.include_manifest = true`,
+    addedAt: new Date(),
     status: 'staged'
   }
 ];

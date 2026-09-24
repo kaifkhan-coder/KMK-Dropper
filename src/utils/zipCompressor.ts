@@ -4,9 +4,10 @@ import {
   WATERMARK_BANNER, 
   injectWatermark, 
   stripWatermark, 
-  generateSecurityManifest,
-  is3DAnimationAsset,
-  generate3DAnimationManifest 
+  generateSecurityManifest, 
+  is3DAnimationFile,
+  generateAnimationManifest,
+  ANIMATION_MANIFEST_FILENAME 
 } from './watermark';
 
 export interface ZipResult {
@@ -18,7 +19,6 @@ export interface ZipResult {
   fileCount: number;
   isBypassActive: boolean;
   generatedAt: Date;
-  has3DAssets?: boolean;
 }
 
 /**
@@ -36,51 +36,23 @@ export async function packageZipArchive(
 
   const zip = new JSZip();
   let totalOriginalBytes = 0;
-  const detected3DAssets: Array<{ name: string; size: number; extension: string }> = [];
 
   // Process files one by one with progress callbacks
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
-    const is3D = is3DAnimationAsset(file.name);
-    const ext = file.extension || file.name.split('.').pop() || '';
-
-    if (is3D) {
-      detected3DAssets.push({ name: file.name, size: file.size, extension: ext });
-    }
-
     const progress = Math.round(((i + 1) / files.length) * 80);
     if (onProgress) {
       onProgress(progress, file.name);
     }
 
-    // 3D animation formats (.obj, .fbx, .stl, .blend) MUST NEVER have their raw binary modified
-    if (is3D) {
-      if (file.binaryBlob) {
-        totalOriginalBytes += file.size;
-        const arrayBuffer = await file.binaryBlob.arrayBuffer();
-        zip.file(file.name, arrayBuffer, {
-          comment: isBypassActive
-            ? '3D Asset - Clean Bypass Mode'
-            : '3D Animation Asset - Signed via animation_manifest.kaif',
-          date: new Date()
-        });
-      } else if (file.content !== undefined) {
-        // e.g. text-based .obj geometry: keep pure raw geometry without comments
-        totalOriginalBytes += new TextEncoder().encode(file.content).length;
-        zip.file(file.name, file.content, {
-          comment: isBypassActive 
-            ? '3D Mesh - Clean Bypass Mode' 
-            : '3D Animation Asset - Raw Geometry Protected',
-          date: new Date()
-        });
-      }
-    } else if (file.isText && file.content !== undefined) {
+    if (file.isText && file.content !== undefined) {
       let finalContent: string;
       if (isBypassActive) {
         // Strip watermark banner if present
         finalContent = stripWatermark(file.content);
       } else {
-        // Mandatory inject watermark banner on line 1 for text and .kaif files
+        // Mandatory inject watermark banner on line 1:
+        // "// [Created by Khan Mohammed Kaif] - 3D Animation & Local Secure Transfer Protocol"
         finalContent = injectWatermark(file.content);
       }
 
@@ -92,6 +64,8 @@ export async function packageZipArchive(
         date: new Date()
       });
     } else if (file.binaryBlob) {
+      // For 3D formats (.obj, .fbx, .stl, .blend) or other binaries:
+      // The system does NOT alter raw asset binary bytes directly.
       totalOriginalBytes += file.size;
       const arrayBuffer = await file.binaryBlob.arrayBuffer();
       zip.file(file.name, arrayBuffer, {
@@ -103,13 +77,15 @@ export async function packageZipArchive(
     }
   }
 
-  // 3D Animation Asset Manifest Layer:
-  // If 3D formats (.obj, .fbx, .stl, .blend) exist and bypass is NOT active,
-  // automatically inject companion metadata ledger named "animation_manifest.kaif" in root
-  if (detected3DAssets.length > 0 && !isBypassActive) {
-    const animationManifest = generate3DAnimationManifest(detected3DAssets);
-    zip.file('animation_manifest.kaif', animationManifest, {
-      comment: 'Authenticated Build Signature - Khan Mohammed Kaif 3D Animation Suite',
+  // 3D Animation Companion Ledger:
+  // Detect .obj, .fbx, .stl, .blend. If present and bypass is NOT active,
+  // automatically inject companion metadata ledger "animation_manifest.kaif" into root directory.
+  // In bypass mode, omit this file completely!
+  const has3DAnimationFiles = files.some(f => is3DAnimationFile(f.name));
+  if (!isBypassActive && has3DAnimationFiles) {
+    const animManifestContent = generateAnimationManifest(files);
+    zip.file(ANIMATION_MANIFEST_FILENAME, animManifestContent, {
+      comment: 'Khan Mohammed Kaif 3D Animation Companion Ledger',
       date: new Date()
     });
   }
@@ -166,7 +142,6 @@ export async function packageZipArchive(
     compressionRatio,
     fileCount: files.length,
     isBypassActive,
-    generatedAt: new Date(),
-    has3DAssets: detected3DAssets.length > 0
+    generatedAt: new Date()
   };
 }

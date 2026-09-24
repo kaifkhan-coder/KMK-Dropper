@@ -95,7 +95,7 @@ export async function syncActivePackageToServer(
 
   // Mirror to Firestore for cross-network and mobile phone direct access
   try {
-    const firestorePackage = {
+    const firestorePackage: Record<string, any> = {
       id: packageId,
       fileName,
       mimeType,
@@ -113,6 +113,12 @@ export async function syncActivePackageToServer(
       })),
       updatedAt: new Date().toISOString()
     };
+
+    // Embed base64 in Firestore if under document limit (1MB) so mobile devices can download directly from cloud
+    if (fileBase64 && fileBase64.length < 950000) {
+      firestorePackage.fileBase64 = fileBase64;
+    }
+
     await setDoc(doc(db, 'packages', packageId), firestorePackage);
     await setDoc(doc(db, 'packages', 'active-latest'), firestorePackage);
   } catch (firestoreErr) {

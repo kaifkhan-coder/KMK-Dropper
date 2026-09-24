@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import JSZip from 'jszip';
-import { Smartphone } from 'lucide-react';
+import { Smartphone, Key, Unlock, Lock, AlertCircle, CheckCircle2, Code2, Sparkles } from 'lucide-react';
 import { DesktopHeader } from './components/DesktopHeader';
 import { WatermarkDashboard } from './components/WatermarkDashboard';
 import { DropZoneAndFileList } from './components/DropZoneAndFileList';
@@ -11,7 +11,8 @@ import { JavaSourceViewer } from './components/JavaSourceViewer';
 import { MobileReceiverModal } from './components/MobileReceiverModal';
 import { MobileReceiverView } from './components/MobileReceiverView';
 import { CloudVaultModal } from './components/CloudVaultModal';
-import { QueuedFile, TransferLog, ServerState, NetworkInterfaceInfo } from './types';
+import { DeveloperUnlockModal } from './components/DeveloperUnlockModal';
+import { QueuedFile, TransferLog, ServerState, NetworkInterfaceInfo, LogLevel } from './types';
 import { DEFAULT_INTERFACES } from './utils/network';
 import { INITIAL_SAMPLE_FILES } from './utils/sampleFiles';
 import { SECRET_AUTH_CODE, WATERMARK_BANNER, injectWatermark, stripWatermark } from './utils/watermark';
@@ -26,6 +27,8 @@ import {
   getWorkspaceId
 } from './utils/cloudSync';
 import { KhanKaifProtocolModal } from './components/KhanKaifProtocolModal';
+import { WebsiteFooter } from './components/WebsiteFooter';
+import { TermsAndPrivacyModal } from './components/TermsAndPrivacyModal';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'gui' | 'java-source' | 'mobile'>('gui');
@@ -46,7 +49,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
-    return [];
+    return INITIAL_SAMPLE_FILES;
   });
 
   const [selectedQrFileId, setSelectedQrFileId] = useState<string | null>(null);
@@ -55,10 +58,57 @@ export default function App() {
   const [showMobileModal, setShowMobileModal] = useState(false);
   const [showCloudVault, setShowCloudVault] = useState(false);
   const [showKhanKaifModal, setShowKhanKaifModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [termsModalTab, setTermsModalTab] = useState<'terms' | 'privacy' | '3d-protocol' | 'architect'>('terms');
   const [isPackaging, setIsPackaging] = useState(false);
   const [isSyncingServer, setIsSyncingServer] = useState(false);
   const [progressPercent, setProgressPercent] = useState(100);
   const [progressMessage, setProgressMessage] = useState('Ready - Micro-Server Listening');
+
+  // Master Developer Secret Code to reveal Java source code and developer architecture
+  const DEV_SECRET_CODE = 'KaifOmniMind447';
+  const [isDevUnlocked, setIsDevUnlocked] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem('kaif_dev_unlocked') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [showDevUnlockModal, setShowDevUnlockModal] = useState(false);
+  const [devToast, setDevToast] = useState<string | null>(null);
+
+  const handleUnlockDevCode = (code: string): boolean => {
+    const trimmed = code.trim();
+    if (trimmed === DEV_SECRET_CODE || trimmed.toLowerCase() === DEV_SECRET_CODE.toLowerCase()) {
+      setIsDevUnlocked(true);
+      try {
+        localStorage.setItem('kaif_dev_unlocked', 'true');
+      } catch {}
+      setActiveTab('java-source'); // Instantly switch to show the unlocked Java code!
+      setDevToast('Secret Code Accepted: Full Java Architecture & Source Code Suite Unlocked!');
+      setTimeout(() => setDevToast(null), 5000);
+      return true;
+    }
+    return false;
+  };
+
+  const handleRelockDevCode = () => {
+    setIsDevUnlocked(false);
+    try {
+      localStorage.removeItem('kaif_dev_unlocked');
+    } catch {}
+    setActiveTab('gui');
+    setDevToast('Restored to simple Drag & Drop interface. Java code section hidden.');
+    setTimeout(() => setDevToast(null), 4000);
+  };
+
+  // Ensure java-source tab cannot remain active if dev mode is locked
+  useEffect(() => {
+    if (!isDevUnlocked && activeTab === 'java-source') {
+      setActiveTab('gui');
+    }
+  }, [isDevUnlocked, activeTab]);
 
   // Workstation Cloud Packages State (no login required)
   const [cloudPackages, setCloudPackages] = useState<CloudPackage[]>([]);
@@ -176,6 +226,73 @@ export default function App() {
     };
     setLogs((prev) => [...prev.slice(-150), newLog]);
   }, []);
+
+  // Poll live backend server logs for real incoming mobile requests & download diagnostics
+  useEffect(() => {
+    let isSubscribed = true;
+    let lastSeenId = '';
+
+    const pollServerLogs = async () => {
+      try {
+        const res = await fetch('/api/server-logs');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && Array.isArray(data.logs) && isSubscribed) {
+          const newLogs: TransferLog[] = [];
+          for (const srv of data.logs) {
+            if (lastSeenId && srv.id <= lastSeenId) continue;
+            let level: LogLevel = 'HTTP';
+            if (srv.level === 'ERROR') level = 'ERROR';
+            else if (srv.level === 'WARN') level = 'WARN';
+            else if (srv.level === 'ZIP') level = 'ZIP';
+            else if (srv.level === 'SECURE') level = 'SECURE';
+            else if (srv.level === 'INFO') level = 'INFO';
+            else if (srv.level === 'NET') level = 'NET';
+
+            newLogs.push({
+              id: srv.id,
+              timestamp: srv.timestamp,
+              level,
+              tag: srv.tag || 'SERVER',
+              message: srv.message
+            });
+          }
+
+          if (data.logs.length > 0) {
+            lastSeenId = data.logs[data.logs.length - 1].id;
+          }
+
+          if (newLogs.length > 0) {
+            setLogs((prev) => {
+              const seen = new Set(prev.map((l) => l.id));
+              const additions = newLogs.filter((l) => !seen.has(l.id));
+              if (additions.length === 0) return prev;
+              return [...prev.slice(-150), ...additions];
+            });
+          }
+        }
+      } catch {
+        // quiet background polling
+      }
+    };
+
+    pollServerLogs();
+    const interval = setInterval(pollServerLogs, 2000);
+    return () => {
+      isSubscribed = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const handleClearAllLogs = async () => {
+    setLogs([]);
+    try {
+      await fetch('/api/server-logs/clear', { method: 'POST' });
+    } catch {
+      // ignore
+    }
+    addLog('INFO', 'CONSOLE', 'Console log history reset.');
+  };
 
   // Load saved cloud snapshots for this workstation on mount
   useEffect(() => {
@@ -457,6 +574,11 @@ export default function App() {
       activeConnections: prev.activeConnections + 1
     }));
 
+    // Trigger real backend download route to generate live server console diagnostics
+    fetch('/api/download/latest', {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }).catch(() => {});
+
     handleDownloadZip();
 
     setTimeout(() => {
@@ -544,7 +666,27 @@ export default function App() {
         onOpenCloudVault={() => setShowCloudVault(true)}
         cloudPackagesCount={cloudPackages.length}
         onOpenKhanKaifModal={() => setShowKhanKaifModal(true)}
+        onOpenTermsModal={(tab) => {
+          setTermsModalTab(tab);
+          setShowTermsModal(true);
+        }}
+        isDevUnlocked={isDevUnlocked}
+        onOpenDevUnlockModal={() => setShowDevUnlockModal(true)}
+        onRelockDevMode={handleRelockDevCode}
       />
+
+      {/* Floating Notification Toast */}
+      {devToast && (
+        <div className="fixed top-16 right-6 z-50 animate-in fade-in slide-in-from-top-3 duration-200">
+          <div className="bg-emerald-950 border border-emerald-600/80 text-emerald-200 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-mono max-w-md">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="flex-1">{devToast}</div>
+            <button onClick={() => setDevToast(null)} className="text-emerald-400 hover:text-white font-bold ml-2">
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Floating Mobile Switcher for Mobile Device Users */}
       <div className="fixed bottom-4 right-4 z-30 lg:hidden">
@@ -559,6 +701,52 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-5">
+        {/* Simple Drag & Drop Mode vs Developer Mode Banner */}
+        {!isDevUnlocked ? (
+          <div className="bg-slate-900/90 border border-slate-800/90 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+              <div>
+                <span className="text-slate-200 font-bold">Simple Drag &amp; Drop Mode:</span>{' '}
+                <span className="text-slate-400">Drag &amp; drop any files below to package and share via QR code.</span>
+              </div>
+            </div>
+            <button
+              id="btn-simple-mode-secret-code-prompt"
+              onClick={() => setShowDevUnlockModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-xs font-mono transition shrink-0 self-start sm:self-auto"
+              title="Enter secret code (KaifOmniMind447) to reveal Java code & developer suite"
+            >
+              <Key className="w-3.5 h-3.5" />
+              <span>Enter Secret Code &quot;KaifOmniMind447&quot;</span>
+            </button>
+          </div>
+        ) : (
+          <div className="bg-emerald-950/40 border border-emerald-700/60 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
+            <div className="flex items-center gap-2.5">
+              <Unlock className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div>
+                <span className="text-emerald-300 font-bold">Developer Suite Unlocked:</span>{' '}
+                <span className="text-emerald-200/90">Java Source Code Suite (7 files + POM) and raw terminal console are active.</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <button
+                onClick={() => setActiveTab('java-source')}
+                className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition shadow-sm"
+              >
+                Inspect Java Code
+              </button>
+              <button
+                onClick={handleRelockDevCode}
+                className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs border border-slate-700 transition"
+              >
+                Relock to Simple Mode
+              </button>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'gui' && (
           <>
             {/* Top: Mandatory Security & Watermark Logic Dashboard */}
@@ -567,6 +755,8 @@ export default function App() {
               onUnlockBypass={handleUnlockBypass}
               onRelockWatermark={handleRelockWatermark}
               stagedFilesCount={files.length}
+              onUnlockDevCode={handleUnlockDevCode}
+              isDevUnlocked={isDevUnlocked}
             />
 
             {/* Central Split: Staging Queue (Left) & ZXing QR Canvas (Right) */}
@@ -602,24 +792,65 @@ export default function App() {
               </div>
             </div>
 
-            {/* Bottom: Micro-Server Controls, Network Resolver & Event Console */}
-            <ServerControlAndConsole
-              serverState={serverState}
-              interfaces={interfaces}
-              logs={logs}
-              progressPercent={progressPercent}
-              progressMessage={progressMessage}
-              onToggleServer={handleToggleServer}
-              onPortChange={handlePortChange}
-              onInterfaceChange={handleInterfaceChange}
-              onClearLogs={() => setLogs([])}
-              onSimulateMobileConnection={handleSimulateMobileConnection}
-            />
+            {/* Bottom: Micro-Server Controls or Simple Server Status */}
+            {isDevUnlocked ? (
+              <ServerControlAndConsole
+                serverState={serverState}
+                interfaces={interfaces}
+                logs={logs}
+                progressPercent={progressPercent}
+                progressMessage={progressMessage}
+                onToggleServer={handleToggleServer}
+                onPortChange={handlePortChange}
+                onInterfaceChange={handleInterfaceChange}
+                onClearLogs={handleClearAllLogs}
+                onSimulateMobileConnection={handleSimulateMobileConnection}
+              />
+            ) : (
+              <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
+                <div className="flex items-center gap-3">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-emerald-400 font-semibold">Local Micro-Server Active</span>
+                  <span className="text-slate-600 hidden sm:inline">•</span>
+                  <span className="text-slate-400 hidden sm:inline">Port: {serverState.port}</span>
+                  <span className="text-slate-600 hidden sm:inline">•</span>
+                  <span className="text-slate-400 hidden sm:inline">Network: {serverState.host}</span>
+                </div>
+                <button
+                  onClick={() => setShowDevUnlockModal(true)}
+                  className="flex items-center gap-1.5 text-slate-400 hover:text-amber-400 transition text-[11px] self-start sm:self-auto"
+                >
+                  <Key className="w-3 h-3 text-amber-400" />
+                  <span>Show Advanced Server Console (Requires KaifOmniMind447)</span>
+                </button>
+              </div>
+            )}
           </>
         )}
 
         {activeTab === 'java-source' && (
-          <JavaSourceViewer onExportProjectZip={handleExportJavaProject} />
+          isDevUnlocked ? (
+            <JavaSourceViewer onExportProjectZip={handleExportJavaProject} />
+          ) : (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center max-w-lg mx-auto my-8 space-y-4 font-mono shadow-2xl">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
+                <Lock className="w-6 h-6" />
+              </div>
+              <h3 className="text-base font-bold text-slate-100">Java Source Code Suite Locked</h3>
+              <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                The multi-file Java architecture and Maven project files are secured. Please enter the master secret code <strong>&quot;KaifOmniMind447&quot;</strong> to view and export the Java source code.
+              </p>
+              <div className="pt-2">
+                <button
+                  onClick={() => setShowDevUnlockModal(true)}
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition shadow-md shadow-amber-500/20 flex items-center gap-2 mx-auto"
+                >
+                  <Key className="w-4 h-4" />
+                  <span>Enter &quot;KaifOmniMind447&quot;</span>
+                </button>
+              </div>
+            </div>
+          )
         )}
 
         {activeTab === 'mobile' && (
@@ -645,6 +876,25 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Prominent Website Footer with inline Terms & Conditions, Privacy Policy & 3D Protocol */}
+      <WebsiteFooter
+        onOpenTermsModal={(tab) => {
+          setTermsModalTab(tab);
+          setShowTermsModal(true);
+        }}
+        isBypassActive={isBypassActive}
+        onQuickUnlockBypass={(key) => handleUnlockBypass(key)}
+      />
+
+      {/* Terms & Conditions, Privacy Policy & 3D Protocol Modal */}
+      <TermsAndPrivacyModal
+        isOpen={showTermsModal}
+        onClose={() => setShowTermsModal(false)}
+        defaultTab={termsModalTab}
+        onAuthorizeBypass={(key) => handleUnlockBypass(key)}
+        isBypassActive={isBypassActive}
+      />
 
       {/* File Inspector Modal */}
       {inspectedFile && (
@@ -681,6 +931,15 @@ export default function App() {
         onDeletePackage={handleDeleteCloudPackage}
         onSaveCurrentStaging={handleSaveToCloud}
         currentStagedFilesCount={files.length}
+      />
+
+      {/* Master Developer Secret Code Unlock Modal */}
+      <DeveloperUnlockModal
+        isOpen={showDevUnlockModal}
+        onClose={() => setShowDevUnlockModal(false)}
+        onUnlock={handleUnlockDevCode}
+        isDevUnlocked={isDevUnlocked}
+        onRelock={handleRelockDevCode}
       />
 
       {/* Remarkable Creation: Khan Kaif Cryptographic Protocol Suite & Inspector Modal */}

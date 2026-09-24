@@ -44,6 +44,7 @@ interface ServerPackageData {
   isBypassActive: boolean;
   fileCount: number;
   size: number;
+  fileBase64?: string;
   files: Array<{
     id: string;
     name: string;
@@ -114,6 +115,7 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
             isBypassActive: Boolean(d.isBypassActive),
             fileCount: d.fileCount || d.files.length,
             size: d.size || 0,
+            fileBase64: d.fileBase64,
             files: d.files,
             createdAt: d.updatedAt ? new Date(d.updatedAt).getTime() : Date.now()
           };
@@ -262,6 +264,28 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
     setDownloading(true);
 
     try {
+      // Instant path: If fileBase64 is present in memory (from cloud or server), download instantly
+      if (packageData.fileBase64) {
+        try {
+          const byteCharacters = atob(packageData.fileBase64);
+          const byteNumbers = new Uint8Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const blob = new Blob([byteNumbers], {
+            type: packageData.mimeType || (isSingleFileMode ? 'application/octet-stream' : 'application/zip')
+          });
+          const downloadName = targetedFile ? targetedFile.name : packageData.fileName;
+          triggerBrowserDownload(blob, downloadName);
+          setDownloadSuccess(true);
+          setTimeout(() => setDownloadSuccess(false), 5000);
+          setDownloading(false);
+          return;
+        } catch (base64Err) {
+          console.warn('Base64 direct decode fallback:', base64Err);
+        }
+      }
+
       if (isSingleFileMode && targetedFile) {
         // Direct single file download: Not converted to .zip!
         const downloadUrl = `/api/download/${packageData.id}/${targetedFile.id}`;
@@ -302,6 +326,19 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
       setDownloading(false);
     }
   };
+
+  // Auto-download support if 'autoDownload=1' is in query parameters
+  useEffect(() => {
+    if (!loading && packageData && packageData.files.length > 0) {
+      const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      if (params && params.get('autoDownload') === '1' && !downloadSuccess && !downloading) {
+        const timer = setTimeout(() => {
+          handlePrimaryDownload();
+        }, 600);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [loading, packageData]);
 
   const generateFallbackZip = async () => {
     if (!packageData) return;

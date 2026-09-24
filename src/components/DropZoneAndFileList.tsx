@@ -1,8 +1,23 @@
 import React, { useRef, useState } from 'react';
-import { UploadCloud, FileCode, FileText, FileSpreadsheet, File, Trash2, Eye, Plus, Sparkles, AlertCircle, QrCode, FileCheck, CloudUpload, Box } from 'lucide-react';
+import { 
+  UploadCloud, 
+  FileCode, 
+  FileText, 
+  FileSpreadsheet, 
+  File, 
+  Trash2, 
+  Eye, 
+  Plus, 
+  Sparkles, 
+  AlertCircle, 
+  QrCode, 
+  FileCheck, 
+  CloudUpload,
+  Box 
+} from 'lucide-react';
 import { QueuedFile } from '../types';
-import { isTextFile, is3DAnimationAsset } from '../utils/watermark';
-import { INITIAL_SAMPLE_FILES } from '../utils/sampleFiles';
+import { isTextFile, is3DAnimationFile } from '../utils/watermark';
+import { INITIAL_SAMPLE_FILES, SAMPLE_3D_ANIMATION_FILES } from '../utils/sampleFiles';
 
 interface DropZoneAndFileListProps {
   files: QueuedFile[];
@@ -129,11 +144,11 @@ export const DropZoneAndFileList: React.FC<DropZoneAndFileListProps> = ({
 
   const getFileIcon = (fileName: string, isText: boolean) => {
     const ext = fileName.split('.').pop()?.toLowerCase();
-    if (ext === 'kaif') {
-      return <Sparkles className="w-4 h-4 text-amber-300" />;
-    }
-    if (is3DAnimationAsset(fileName)) {
+    if (is3DAnimationFile(fileName)) {
       return <Box className="w-4 h-4 text-cyan-400" />;
+    }
+    if (ext === 'kaif') {
+      return <FileCode className="w-4 h-4 text-amber-400" />;
     }
     if (ext === 'java' || ext === 'py' || ext === 'js' || ext === 'ts' || ext === 'cpp') {
       return <FileCode className="w-4 h-4 text-emerald-400" />;
@@ -259,7 +274,7 @@ export const DropZoneAndFileList: React.FC<DropZoneAndFileListProps> = ({
             <p className="text-[11px] text-slate-400 mt-1 max-w-sm mx-auto">
               Drop files above, click &quot;Browse From Computer&quot;, or create a custom code snippet.
             </p>
-            <div className="mt-4 flex items-center justify-center gap-2">
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               <button
                 onClick={() => setShowCustomSnippetModal(true)}
                 className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-mono transition"
@@ -269,9 +284,17 @@ export const DropZoneAndFileList: React.FC<DropZoneAndFileListProps> = ({
               <button
                 onClick={() => onAddFiles(INITIAL_SAMPLE_FILES)}
                 className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-mono transition"
-                title="Optional: Load demo test files on-demand"
+                title="Load standard student files"
               >
                 Load Demo Files
+              </button>
+              <button
+                onClick={() => onAddFiles(SAMPLE_3D_ANIMATION_FILES)}
+                className="px-3 py-1.5 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-800 rounded-lg text-xs font-mono transition flex items-center gap-1.5"
+                title="Load 3D model and .kaif rigging script to test animation_manifest.kaif injection"
+              >
+                <Box className="w-3.5 h-3.5" />
+                <span>Load 3D Assets (.obj, .blend)</span>
               </button>
             </div>
           </div>
@@ -300,12 +323,17 @@ export const DropZoneAndFileList: React.FC<DropZoneAndFileListProps> = ({
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                  <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5 flex-wrap">
                     <span className="capitalize">{file.extension || 'binary'}</span>
                     <span>•</span>
                     {file.isText ? (
                       <span className={isBypassActive ? 'text-emerald-400 font-semibold' : 'text-amber-400 font-semibold'}>
                         {isBypassActive ? 'Clean Stream (Bypass Active)' : 'Line 1 Header Watermark'}
+                      </span>
+                    ) : is3DAnimationFile(file.name) ? (
+                      <span className="text-cyan-400 font-semibold flex items-center gap-1">
+                        <Box className="w-3 h-3" />
+                        <span>{isBypassActive ? 'Clean 3D Binary' : 'Companion animation_manifest.kaif'}</span>
                       </span>
                     ) : (
                       <span className="text-cyan-400">

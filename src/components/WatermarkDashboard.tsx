@@ -1,19 +1,23 @@
 import React, { useState } from 'react';
-import { ShieldAlert, ShieldCheck, Key, Lock, Unlock, Eye, EyeOff, AlertTriangle } from 'lucide-react';
-import { WATERMARK_BANNER } from '../utils/watermark';
+import { ShieldAlert, ShieldCheck, Key, Lock, Unlock, Eye, EyeOff, AlertTriangle, Box, FileCode } from 'lucide-react';
+import { WATERMARK_BANNER, SECRET_AUTH_CODE } from '../utils/watermark';
 
 interface WatermarkDashboardProps {
   isBypassActive: boolean;
   onUnlockBypass: (code: string) => boolean;
   onRelockWatermark: () => void;
   stagedFilesCount: number;
+  onUnlockDevCode?: (code: string) => boolean;
+  isDevUnlocked?: boolean;
 }
 
 export const WatermarkDashboard: React.FC<WatermarkDashboardProps> = ({
   isBypassActive,
   onUnlockBypass,
   onRelockWatermark,
-  stagedFilesCount
+  stagedFilesCount,
+  onUnlockDevCode,
+  isDevUnlocked = false
 }) => {
   const [codeInput, setCodeInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -24,25 +28,38 @@ export const WatermarkDashboard: React.FC<WatermarkDashboardProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!codeInput.trim()) {
+    const trimmed = codeInput.trim();
+    if (!trimmed) {
       setFeedback({
         type: 'error',
-        message: 'Please enter the authorization or coupon code to remove watermark.'
+        message: 'Please enter the authorization clearance code ("BuildWithKMKaif") or secret developer key ("KaifOmniMind447").'
       });
       return;
     }
 
-    const success = onUnlockBypass(codeInput.trim());
+    if (trimmed.toLowerCase() === 'kaifomnimind447') {
+      if (onUnlockDevCode) {
+        onUnlockDevCode(trimmed);
+      }
+      setFeedback({
+        type: 'success',
+        message: 'Developer Secret Code Accepted! Java Source Code Suite and Developer Architecture are now UNLOCKED.'
+      });
+      setCodeInput('');
+      return;
+    }
+
+    const success = onUnlockBypass(trimmed);
     if (success) {
       setFeedback({
         type: 'success',
-        message: 'Coupon code accepted! Clean Bypass Mode is now ACTIVE. Watermark ("BuildWithKMKaif") removed from all files.'
+        message: 'Security clearance verified! Clean Bypass Mode is now ACTIVE. Line-1 comments suppressed and 3D companion animation manifests omitted.'
       });
       setCodeInput('');
     } else {
       setFeedback({
         type: 'error',
-        message: 'Invalid code: Coupon code does not match. Watermark "BuildWithKMKaif" remains enforced.'
+        message: 'Invalid code: Clearance key does not match. Secret code is "BuildWithKMKaif" or developer code "KaifOmniMind447".'
       });
     }
   };
@@ -51,7 +68,7 @@ export const WatermarkDashboard: React.FC<WatermarkDashboardProps> = ({
     onRelockWatermark();
     setFeedback({
       type: 'success',
-      message: 'Watermark re-enabled. All files will include "BuildWithKMKaif".'
+      message: 'Watermarks re-enabled. Text files stamped on Line 1, and 3D packages (.obj, .fbx, .stl, .blend) will inject animation_manifest.kaif.'
     });
   };
 
@@ -70,7 +87,7 @@ export const WatermarkDashboard: React.FC<WatermarkDashboardProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-bold uppercase tracking-wider text-slate-200">
-                Watermark Management Dashboard
+                Security &amp; 3D Animation Watermark Pipeline
               </h2>
               <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-semibold border ${
                 isBypassActive
@@ -80,10 +97,10 @@ export const WatermarkDashboard: React.FC<WatermarkDashboardProps> = ({
                 {isBypassActive ? 'CLEAN BYPASS MODE ACTIVE' : 'MANDATORY WATERMARK ENFORCED'}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5 font-mono">
+            <p className="text-xs text-slate-400 mt-0.5 font-mono truncate max-w-xl">
               {isBypassActive 
-                ? 'Parsing engine is currently stripping the banner from all outgoing file streams.' 
-                : `Target banner: "${WATERMARK_BANNER}"`}
+                ? 'Parsing engine is currently stripping the banner from text and omitting 3D companion manifests.' 
+                : `Target Line 1: "${WATERMARK_BANNER}"`}
             </p>
           </div>
         </div>
@@ -95,8 +112,9 @@ export const WatermarkDashboard: React.FC<WatermarkDashboardProps> = ({
             <span className="text-amber-400 font-semibold">{stagedFilesCount}</span>
           </div>
           <div className="bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 text-slate-300 flex items-center gap-2">
-            <span className="text-slate-500">Protocol:</span>
-            <span className="text-emerald-400 font-semibold">Khan Kaif STP/1.0</span>
+            <Box className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-slate-500">3D Assets:</span>
+            <span className="text-cyan-400 font-semibold">.obj .fbx .stl .blend</span>
           </div>
         </div>
       </div>
@@ -114,7 +132,7 @@ export const WatermarkDashboard: React.FC<WatermarkDashboardProps> = ({
                 type={showPassword ? 'text' : 'password'}
                 value={codeInput}
                 onChange={(e) => setCodeInput(e.target.value)}
-                placeholder="Enter bypass authorization key..."
+                placeholder='Enter clearance key: "BuildWithKMKaif"...'
                 autoComplete="off"
                 className="w-full pl-9 pr-10 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition"
               />
@@ -135,7 +153,7 @@ export const WatermarkDashboard: React.FC<WatermarkDashboardProps> = ({
               className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold text-xs rounded-lg transition shadow-sm hover:shadow flex items-center justify-center gap-1.5 whitespace-nowrap"
             >
               <Unlock className="w-3.5 h-3.5" />
-              <span>Apply Coupon Code</span>
+              <span>Authorize Bypass</span>
             </button>
 
             {isBypassActive && (
@@ -156,10 +174,10 @@ export const WatermarkDashboard: React.FC<WatermarkDashboardProps> = ({
         <div className="lg:col-span-4 bg-slate-950/70 border border-slate-800/80 rounded-lg px-3 py-2 text-[11px] font-mono flex items-center justify-between">
           <span className="flex items-center gap-1.5 text-slate-400">
             <ShieldAlert className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span>Coupon / Auth:</span>
+            <span>Clearance Key:</span>
           </span>
-          <span className="text-amber-400 font-medium bg-slate-900 border border-slate-700 px-2 py-0.5 rounded text-[10px]">
-            KaifGive20@ (Watermark Off)
+          <span className="text-amber-400 font-semibold bg-slate-900 border border-slate-700 px-2.5 py-0.5 rounded text-[11px] font-mono">
+            {SECRET_AUTH_CODE}
           </span>
         </div>
       </div>

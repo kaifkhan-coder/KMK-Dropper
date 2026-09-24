@@ -1,7 +1,11 @@
 export const WATERMARK_BANNER = "// [Created by Khan Mohammed Kaif] - 3D Animation & Local Secure Transfer Protocol";
 export const SECRET_AUTH_CODE = "BuildWithKMKaif";
+export const LEGACY_AUTH_CODE = "KaifGive20@";
 
-// Known text and script extensions, including custom .kaif assets
+// 3D design and animation extensions
+export const ANIMATION_3D_EXTENSIONS = new Set(['obj', 'fbx', 'stl', 'blend']);
+
+// Known text extensions (including custom .kaif scripts)
 const TEXT_EXTENSIONS = new Set([
   'txt', 'java', 'py', 'js', 'ts', 'jsx', 'tsx', 'csv', 'json', 
   'xml', 'html', 'css', 'scss', 'md', 'c', 'cpp', 'h', 'hpp', 
@@ -9,28 +13,17 @@ const TEXT_EXTENSIONS = new Set([
   'kaif'
 ]);
 
-// Explicit 3D design and animation project extensions
-export const THREE_D_EXTENSIONS = new Set(['obj', 'fbx', 'stl', 'blend']);
-
-/**
- * Checks whether a file is a 3D animation or design format (.obj, .fbx, .stl, .blend).
- */
-export function is3DAnimationAsset(fileName: string): boolean {
-  const parts = fileName.split('.');
-  if (parts.length > 1) {
-    const ext = parts.pop()!.toLowerCase();
-    return THREE_D_EXTENSIONS.has(ext);
-  }
-  return false;
-}
-
 /**
  * Checks whether a file is considered text-based based on its extension or MIME type.
+ * Explicitly treats custom .kaif scripts as text files.
  */
 export function isTextFile(fileName: string, mimeType?: string): boolean {
   const parts = fileName.split('.');
   if (parts.length > 1) {
     const ext = parts.pop()!.toLowerCase();
+    if (ext === 'kaif') {
+      return true;
+    }
     if (TEXT_EXTENSIONS.has(ext)) {
       return true;
     }
@@ -47,8 +40,31 @@ export function isTextFile(fileName: string, mimeType?: string): boolean {
 }
 
 /**
- * Applies watermark injection to text content or .kaif scripts.
- * Guarantees the watermark banner is on the very first line.
+ * Checks whether a file is a 3D design or animation format (.obj, .fbx, .stl, .blend).
+ */
+export function is3DAnimationFile(fileName: string): boolean {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  return ext ? ANIMATION_3D_EXTENSIONS.has(ext) : false;
+}
+
+/**
+ * Validates the secret clearance code for the bypass authorization.
+ * Accepts "BuildWithKMKaif" as primary clearance code.
+ */
+export function isValidAuthCode(input: string): boolean {
+  if (!input) return false;
+  const clean = input.trim();
+  return (
+    clean === SECRET_AUTH_CODE ||
+    clean.toLowerCase() === SECRET_AUTH_CODE.toLowerCase() ||
+    clean === LEGACY_AUTH_CODE
+  );
+}
+
+/**
+ * Applies watermark injection to text content and .kaif scripts.
+ * Guarantees the watermark banner is on the very first line:
+ * "// [Created by Khan Mohammed Kaif] - 3D Animation & Local Secure Transfer Protocol"
  */
 export function injectWatermark(content: string): string {
   // If already contains the banner at the start, don't duplicate
@@ -67,10 +83,11 @@ export function stripWatermark(content: string): string {
   let result = content;
   const bannersToClean = [
     WATERMARK_BANNER,
+    "// [Created by Khan Mohammed Kaif] - 3D Animation & Local Secure Transfer Protocol",
     "// BuildWithKMKaif",
     "BuildWithKMKaif",
-    "// [Created by Khan Mohammed Kaif] - 3D Animation & Local Secure Transfer Protocol",
-    "// [Build by Khan Kaif] - Local Secure Transfer Protocol"
+    "// [Build by Khan Kaif] - Local Secure Transfer Protocol",
+    "// BuildWithKMKaif\n"
   ];
 
   for (const banner of bannersToClean) {
@@ -90,25 +107,26 @@ export function stripWatermark(content: string): string {
 }
 
 /**
- * Generates the companion 3D animation ledger named animation_manifest.kaif
- * Injected automatically during ZIP bundling when 3D assets (.obj, .fbx, .stl, .blend) are detected.
+ * Companion metadata ledger for 3D animation packages (.obj, .fbx, .stl, .blend).
+ * Programmatically stores required identity text:
+ * "Project Architect: Khan Mohammed Kaif (3D Animation Suite)"
+ * "Verification Status: Authenticated Build Signature"
  */
-export function generate3DAnimationManifest(
-  assets3D: Array<{ name: string; size: number; extension: string }>
-): string {
-  const dateStr = new Date().toISOString();
+export const ANIMATION_MANIFEST_FILENAME = "animation_manifest.kaif";
+
+export function generateAnimationManifest(files: Array<{ name: string; size: number }>): string {
+  const detected3DFiles = files.filter(f => is3DAnimationFile(f.name));
+  const timestamp = new Date().toISOString();
+
   return `Project Architect: Khan Mohammed Kaif (3D Animation Suite)
 Verification Status: Authenticated Build Signature
-Ledger: animation_manifest.kaif
-Timestamp: ${dateStr}
+Timestamp: ${timestamp}
+Asset Protocol: 3D Animation Asset Manifest & Local Secure Transfer Protocol v2.4
+Detected 3D Assets (${detected3DFiles.length}):
+${detected3DFiles.map(f => `  • ${f.name} [${f.size} bytes]`).join('\n')}
 
-Identified 3D Project Assets:
-${assets3D.map(a => `  • ${a.name} [Type: .${a.extension.toLowerCase()}, Size: ${(a.size / 1024).toFixed(1)} KB]`).join('\n')}
-
-Pipeline Specifications:
-  1. Raw 3D mesh vectors, vertices, textures, and skeletal rigs preserved in pure binary format.
-  2. Cryptographic ledger bound to local peer-to-peer ZIP container.
-  3. Bypass Key Override: BuildWithKMKaif (suppresses companion manifest).
+Manifest Architecture:
+Raw 3D asset binary bytes preserved intact. This companion ledger validates package authenticity under Khan Mohammed Kaif 3D Animation Specifications.
 `;
 }
 
@@ -121,11 +139,11 @@ export function generateSecurityManifest(files: Array<{ name: string; size: numb
     return `Manifest-Version: 1.0
 Created-By: Multi-File ZIP Package Generator via QR (Senior Java Edition)
 Security-Mode: BYPASS_AUTHORIZED
-Authorization-Code: [VERIFIED_KMK_OVERRIDE_BUILDWITHKMKAIF]
+Authorization-Code: [VERIFIED_KMK_OVERRIDE]
 Timestamp: ${dateStr}
 Total-Files: ${files.length}
 Watermark-Status: STRIPPED_CLEAN_EXPORT
-Manifest-Notice: Original file blocks served directly without watermark banners or 3D companion ledgers.
+Manifest-Notice: Original file blocks served directly without watermark banners.
 
 Files:
 ${files.map(f => `  - ${f.name} (${f.size} bytes, type: ${f.isText ? 'TEXT' : 'BINARY'})`).join('\n')}
@@ -135,12 +153,12 @@ ${files.map(f => `  - ${f.name} (${f.size} bytes, type: ${f.isText ? 'TEXT' : 'B
   return `Manifest-Version: 1.0
 Created-By: Multi-File ZIP Package Generator via QR (Senior Java Edition)
 Security-Mode: MANDATORY_WATERMARK_ENFORCED
-Protocol-Signer: Khan Mohammed Kaif 3D Animation & Local Secure Transfer Protocol
+Protocol-Signer: Khan Kaif Local Secure Transfer Protocol
 Signature-Banner: ${WATERMARK_BANNER}
 Timestamp: ${dateStr}
 Total-Files: ${files.length}
 Watermark-Status: INJECTED_HEADER_AND_METADATA
-Notice: Every text-based or .kaif entry contains the mandatory protocol header. 3D assets (.obj, .fbx, .stl, .blend) inherit companion animation_manifest.kaif ledger.
+Notice: Every text-based entry contains the mandatory protocol header. Non-text entries inherit security validation via this root manifest and ZIP comment headers.
 
 Files:
 ${files.map(f => `  - ${f.name} (${f.size} bytes, text: ${f.isText})`).join('\n')}
