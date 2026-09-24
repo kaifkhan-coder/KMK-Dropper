@@ -29,6 +29,13 @@ import {
 import { KhanKaifProtocolModal } from './components/KhanKaifProtocolModal';
 import { WebsiteFooter } from './components/WebsiteFooter';
 import { TermsAndPrivacyModal } from './components/TermsAndPrivacyModal';
+import { SecurityManagerModal } from './components/SecurityManagerModal';
+import { 
+  isDownloadProtectionEnabled, 
+  isSessionUnlocked, 
+  syncRemoteSecurityConfig, 
+  verifySecretCode 
+} from './utils/securityConfig';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'gui' | 'java-source' | 'mobile'>('gui');
@@ -66,11 +73,10 @@ export default function App() {
   const [progressMessage, setProgressMessage] = useState('Ready - Micro-Server Listening');
 
   // Master Developer Secret Code to reveal Java source code and developer architecture
-  const DEV_SECRET_CODE = 'KaifOmniMind447';
   const [isDevUnlocked, setIsDevUnlocked] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     try {
-      return localStorage.getItem('kaif_dev_unlocked') === 'true';
+      return localStorage.getItem('kaif_dev_unlocked') === 'true' || isSessionUnlocked();
     } catch {
       return false;
     }
@@ -78,9 +84,19 @@ export default function App() {
   const [showDevUnlockModal, setShowDevUnlockModal] = useState(false);
   const [devToast, setDevToast] = useState<string | null>(null);
 
+  // Security Gatekeeper & Passcode Management Modal
+  const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [securityModalTargetName, setSecurityModalTargetName] = useState('');
+  const [securityModalMode, setSecurityModalMode] = useState<'verify' | 'settings'>('verify');
+  const [pendingDownloadAction, setPendingDownloadAction] = useState<(() => void) | null>(null);
+
+  useEffect(() => {
+    syncRemoteSecurityConfig();
+  }, []);
+
   const handleUnlockDevCode = (code: string): boolean => {
-    const trimmed = code.trim();
-    if (trimmed === DEV_SECRET_CODE || trimmed.toLowerCase() === DEV_SECRET_CODE.toLowerCase()) {
+    const success = verifySecretCode(code);
+    if (success) {
       setIsDevUnlocked(true);
       try {
         localStorage.setItem('kaif_dev_unlocked', 'true');

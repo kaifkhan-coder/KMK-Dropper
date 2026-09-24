@@ -12,6 +12,7 @@ interface MobileReceiverModalProps {
   selectedQrFileId?: string | null;
   onClose: () => void;
   onDownloadZip: () => void;
+  onDownloadSingleFile?: (file: QueuedFile) => void;
   isPackaging: boolean;
 }
 
@@ -24,6 +25,7 @@ export const MobileReceiverModal: React.FC<MobileReceiverModalProps> = ({
   selectedQrFileId,
   onClose,
   onDownloadZip,
+  onDownloadSingleFile,
   isPackaging
 }) => {
   const [downloadSuccess, setDownloadSuccess] = useState(false);

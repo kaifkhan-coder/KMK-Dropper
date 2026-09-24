@@ -263,28 +263,18 @@ async function startServer() {
         const duration = Date.now() - startTime;
         const statusCode = res.statusCode;
         const isError = statusCode >= 400;
-        const logLevel = isError ? 'ERROR' : (req.path.includes('/download') ? 'ZIP' : 'HTTP');
+        const isDownloadRoute = req.path.includes('/download');
+        const tag = isError ? (isDownloadRoute ? 'DOWNLOAD-ERR' : 'HTTP-ERR') : (isDownloadRoute ? 'COMPLETE' : 'HTTP');
+        const logLevel: ServerLogEntry['level'] = isError ? (statusCode >= 500 ? 'ERROR' : 'WARN') : (isDownloadRoute ? 'ZIP' : 'HTTP');
 
         const message = `${req.method} ${req.originalUrl} -> ${statusCode} ${res.statusMessage || ''} (${duration}ms)`;
 
-        addServerLog(logLevel, isError ? 'DOWNLOAD-ERR' : 'COMPLETE', message, {
+        addServerLog(logLevel, tag, message, {
           ip: cleanIp,
           device: deviceInfo.device,
           statusCode,
           durationMs: duration
         });
-
-        if (isError) {
-          console.error(
-            `${ANSI.red}[DIAGNOSTIC FAILURE]${ANSI.reset} Mobile request failed:\n` +
-            `  URL: ${req.originalUrl}\n` +
-            `  Client IP: ${cleanIp}\n` +
-            `  Device: ${deviceInfo.device} (${ua})\n` +
-            `  Headers: Accept=${req.headers['accept'] || '*/*'}, Range=${req.headers['range'] || 'none'}, Referer=${req.headers['referer'] || 'direct'}\n` +
-            `  Active Packages in Memory: [${Array.from(packagesMap.keys()).join(', ')}]\n` +
-            `  Latest Package ID: ${latestPackageId || 'none'}`
-          );
-        }
       }
     });
 
@@ -293,6 +283,7 @@ async function startServer() {
 
   // JSON payload parser for base64 packages up to 50MB
   app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
   // API Routes FIRST
 
@@ -322,26 +313,62 @@ async function startServer() {
     res.json({ success: true, message: 'Logs cleared.' });
   });
 
-  // Store/Publish an active package or single file
-  app.post('/api/package', (req, res) => {
+  // Store/Publish an active package or single file - resilient with auto-fallbacks
+  app.post('/api/package', async (req, res) => {
     try {
-      const { id, fileName, mimeType, isSingleFile, isBypassActive, files, fileBase64, zipBase64 } = req.body;
-      const base64Data = fileBase64 || zipBase64;
-      if (!id || !fileName || !base64Data) {
-        addServerLog('WARN', 'PACKAGE-POST', `Missing package id, fileName, or data in payload.`);
-        return res.status(400).json({ error: 'Missing package id, fileName, or data' });
+      const body = req.body || {};
+      const id = body.id || body.packageId || body.pkg || `pkg-${Date.now().toString(36)}`;
+      let fileName = body.fileName || body.filename || body.name;
+      const isSingleFile = Boolean(body.isSingleFile || (Array.isArray(body.files) && body.files.length === 1));
+      let mimeType = body.mimeType || (isSingleFile ? 'text/plain;charset=utf-8' : 'application/zip');
+      const isBypassActive = Boolean(body.isBypassActive);
+      const files: Array<any> = Array.isArray(body.files) ? body.files : [];
+
+      let fileBuffer: Buffer | null = null;
+      const base64Data = body.fileBase64 || body.zipBase64 || body.data || body.base64;
+
+      if (base64Data && typeof base64Data === 'string' && base64Data.trim().length > 0) {
+        try {
+          fileBuffer = Buffer.from(base64Data, 'base64');
+        } catch {
+          fileBuffer = null;
+        }
       }
 
-      const fileBuffer = Buffer.from(base64Data, 'base64');
-      const singleFileMode = Boolean(isSingleFile || (Array.isArray(files) && files.length === 1));
-      
+      // If client didn't supply base64, build package buffer on server using JSZip or file contents
+      if (!fileBuffer || fileBuffer.length === 0) {
+        if (files.length > 0) {
+          if (isSingleFile && files[0].content !== undefined) {
+            fileBuffer = Buffer.from(files[0].content, 'utf-8');
+            if (!fileName) fileName = files[0].name || 'file.txt';
+          } else {
+            const zip = new JSZip();
+            for (const f of files) {
+              zip.file(f.name || 'file.txt', f.content || '');
+            }
+            fileBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+            if (!fileName) fileName = `Package_${isBypassActive ? 'CLEAN_BYPASS' : 'SECURE_WM'}_Transfer.zip`;
+          }
+        } else {
+          // Pre-seed default package content
+          const zip = new JSZip();
+          zip.file('README.txt', '// [Created by Khan Mohammed Kaif] - 3D Animation & Local Secure Transfer Protocol\nMulti-File package initialized.\n');
+          fileBuffer = await zip.generateAsync({ type: 'nodebuffer' });
+          if (!fileName) fileName = 'package.zip';
+        }
+      }
+
+      if (!fileName) {
+        fileName = isSingleFile ? 'transfer_file.bin' : 'package.zip';
+      }
+
       const newPackage: StoredPackage = {
         id,
         fileName,
-        mimeType: mimeType || (singleFileMode ? 'application/octet-stream' : 'application/zip'),
-        isSingleFile: singleFileMode,
-        isBypassActive: Boolean(isBypassActive),
-        files: Array.isArray(files) ? files : [],
+        mimeType,
+        isSingleFile,
+        isBypassActive,
+        files,
         fileBuffer,
         createdAt: Date.now()
       };
@@ -359,14 +386,14 @@ async function startServer() {
       addServerLog(
         'ZIP',
         'SYNC-SERVER',
-        `Package registered: ${id} ("${fileName}", ${fileBuffer.length} bytes, Single=${singleFileMode}, Bypass=${Boolean(isBypassActive)})`
+        `Package registered: ${id} ("${fileName}", ${fileBuffer.length} bytes, Single=${isSingleFile}, Bypass=${isBypassActive})`
       );
 
       res.json({
         success: true,
         id,
         fileName,
-        isSingleFile: singleFileMode,
+        isSingleFile,
         mimeType: newPackage.mimeType,
         size: fileBuffer.length,
         fileCount: newPackage.files.length,
@@ -482,7 +509,26 @@ async function startServer() {
       return res.send(pkg.fileBuffer);
     }
 
-    return res.status(404).send('Direct binary extraction requires single-file staging or ZIP package.');
+    // Extract individual binary file directly from ZIP archive
+    if (pkg.fileBuffer && pkg.fileBuffer.length > 0) {
+      try {
+        const zip = await JSZip.loadAsync(pkg.fileBuffer);
+        const entry = zip.file(targetFile.name);
+        if (entry) {
+          const entryBuffer = await entry.async('nodebuffer');
+          res.setHeader('Content-Type', 'application/octet-stream');
+          res.setHeader('Content-Disposition', `attachment; filename="${cleanName}"; filename*=UTF-8''${encodeURIComponent(targetFile.name)}`);
+          res.setHeader('Content-Length', entryBuffer.length);
+          res.setHeader('Accept-Ranges', 'bytes');
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          return res.send(entryBuffer);
+        }
+      } catch (zipExtractErr: any) {
+        addServerLog('ERROR', 'ZIP-EXTRACT', `Failed to extract '${targetFile.name}' from zip: ${zipExtractErr.message}`);
+      }
+    }
+
+    return res.status(404).send('Direct binary extraction failed.');
   });
 
   // Universal Download Handler with Robust Mobile Range, RFC 6266 Headers & Diagnostic Logging

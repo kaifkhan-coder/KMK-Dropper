@@ -13,7 +13,8 @@ import {
   QrCode, 
   FileCheck, 
   CloudUpload,
-  Box 
+  Box,
+  Download
 } from 'lucide-react';
 import { QueuedFile } from '../types';
 import { isTextFile, is3DAnimationFile } from '../utils/watermark';
@@ -29,6 +30,7 @@ interface DropZoneAndFileListProps {
   selectedQrFileId?: string | null;
   onSelectQrFile?: (fileId: string | null) => void;
   onOpenSaveToCloud?: () => void;
+  onDownloadSingleFile?: (file: QueuedFile) => void;
 }
 
 export const DropZoneAndFileList: React.FC<DropZoneAndFileListProps> = ({
@@ -40,7 +42,8 @@ export const DropZoneAndFileList: React.FC<DropZoneAndFileListProps> = ({
   isBypassActive,
   selectedQrFileId,
   onSelectQrFile,
-  onOpenSaveToCloud
+  onOpenSaveToCloud,
+  onDownloadSingleFile
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -223,8 +226,9 @@ export const DropZoneAndFileList: React.FC<DropZoneAndFileListProps> = ({
           )}
 
           {files.length > 1 && (
-            <span className="px-2 py-0.5 bg-cyan-950/60 border border-cyan-800/60 text-cyan-400 rounded text-[10px] font-mono">
-              Multi-File: Bundled as .zip
+            <span className="px-2 py-0.5 bg-emerald-950/70 border border-emerald-700/70 text-emerald-300 rounded text-[10px] font-mono flex items-center gap-1 font-bold">
+              <Download className="w-3 h-3 text-emerald-400" />
+              <span>Multi-File: Separate Download Available for Every File</span>
             </span>
           )}
         </div>
@@ -345,6 +349,18 @@ export const DropZoneAndFileList: React.FC<DropZoneAndFileListProps> = ({
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0">
+                {/* Dedicated Separate Download Button for Every File */}
+                {onDownloadSingleFile && (
+                  <button
+                    onClick={() => onDownloadSingleFile(file)}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-emerald-500/15 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 border border-emerald-500/40 rounded-md text-[11px] font-mono font-bold transition shadow-xs shrink-0"
+                    title={`Download '${file.name}' individually (Requires secret code)`}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download</span>
+                  </button>
+                )}
+
                 {/* Specific File QR Code Selector */}
                 <button
                   onClick={() => onSelectQrFile?.(selectedQrFileId === file.id ? null : file.id)}

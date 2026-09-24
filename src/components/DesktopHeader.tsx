@@ -152,27 +152,27 @@ export const DesktopHeader: React.FC<DesktopHeaderProps> = ({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          {/* Secret Code Unlock / Dev Status Button */}
+          {/* Secret Code Unlock / Owner Security Button */}
           {isDevUnlocked ? (
             <button
               id="btn-dev-mode-active"
               onClick={onOpenDevUnlockModal}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-700/80 rounded-lg text-xs font-mono transition"
-              title="Developer Suite Unlocked (KaifOmniMind447). Click to view status or relock."
+              title="Security Authorization Active. Click to access settings, change code, or disable protection."
             >
               <Unlock className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">Developer Unlocked:</span>
-              <span className="font-bold text-emerald-200">KaifOmniMind447</span>
+              <span className="hidden sm:inline">Owner Authorized:</span>
+              <span className="font-bold text-emerald-200">Security Settings</span>
             </button>
           ) : (
             <button
               id="btn-unlock-secret-code"
               onClick={onOpenDevUnlockModal}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-xs font-mono transition shadow-sm"
-              title="Enter secret code (KaifOmniMind447) to unlock Java Source Code & developer suite"
+              title="Enter owner secret code to manage security settings & download permissions"
             >
-              <Key className="w-3.5 h-3.5" />
-              <span>Enter Secret Code</span>
+              <Lock className="w-3.5 h-3.5" />
+              <span>Owner Security</span>
             </button>
           )}
 

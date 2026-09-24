@@ -18,7 +18,10 @@ import {
   FileCheck,
   Type,
   Monitor,
-  Award
+  Award,
+  Lock,
+  Unlock,
+  Key
 } from 'lucide-react';
 import { QueuedFile } from '../types';
 import { packageZipArchive } from '../utils/zipCompressor';
@@ -27,6 +30,12 @@ import { INITIAL_SAMPLE_FILES } from '../utils/sampleFiles';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { KhanKaifProtocolModal } from './KhanKaifProtocolModal';
+import { SecurityManagerModal } from './SecurityManagerModal';
+import { 
+  isDownloadProtectionEnabled, 
+  isSessionUnlocked, 
+  syncRemoteSecurityConfig 
+} from '../utils/securityConfig';
 
 interface MobileReceiverViewProps {
   packageId?: string;
@@ -71,6 +80,16 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
   const [previewFontSize, setPreviewFontSize] = useState<'text-xs' | 'text-sm' | 'text-base'>('text-xs');
   const [showProtocolModal, setShowProtocolModal] = useState(false);
   const [activeBypassState, setActiveBypassState] = useState<boolean>(localIsBypassActive);
+
+  // Download Passcode Gatekeeper & Owner Security Settings
+  const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [securityModalTargetName, setSecurityModalTargetName] = useState('');
+  const [securityModalMode, setSecurityModalMode] = useState<'verify' | 'settings'>('verify');
+  const [pendingDownloadAction, setPendingDownloadAction] = useState<(() => void) | null>(null);
+
+  useEffect(() => {
+    syncRemoteSecurityConfig();
+  }, []);
 
   // Fetch package metadata from backend API with multi-tier Firestore & Cloud fallback
   const fetchPackage = useCallback(async () => {
@@ -258,8 +277,8 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
     ? (fileId ? packageData.files.find(f => f.id === fileId || f.name === fileId) : packageData.files[0]) || packageData.files[0]
     : null;
 
-  // Handle Download: Single file (as-is, no ZIP) OR Multi-file (ZIP)
-  const handlePrimaryDownload = async () => {
+  // Execute Primary Download: Single file (as-is, no ZIP) OR Multi-file (ZIP)
+  const executePrimaryDownload = async () => {
     if (!packageData) return;
     setDownloading(true);
 
@@ -327,6 +346,20 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
     }
   };
 
+  // Passcode-gated primary download
+  const handlePrimaryDownload = async () => {
+    if (!packageData) return;
+    if (isDownloadProtectionEnabled() && !isSessionUnlocked()) {
+      const targetName = targetedFile ? targetedFile.name : (packageData.fileName || 'package.zip');
+      setSecurityModalTargetName(targetName);
+      setSecurityModalMode('verify');
+      setPendingDownloadAction(() => () => executePrimaryDownload());
+      setShowSecurityModal(true);
+      return;
+    }
+    await executePrimaryDownload();
+  };
+
   // Auto-download support if 'autoDownload=1' is in query parameters
   useEffect(() => {
     if (!loading && packageData && packageData.files.length > 0) {
@@ -372,8 +405,8 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  // Download individual file
-  const handleDownloadSingleFile = (file: { name: string; content?: string; id?: string }) => {
+  // Download individual file execution
+  const executeDownloadSingleFile = (file: { name: string; content?: string; id?: string }) => {
     if (!packageData) return;
     if (file.content) {
       const content = packageData.isBypassActive
@@ -384,6 +417,19 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
     } else {
       window.open(`/api/download/${packageData.id}/${file.id || file.name}`, '_blank');
     }
+  };
+
+  // Passcode-gated single file download
+  const handleDownloadSingleFile = (file: { name: string; content?: string; id?: string }) => {
+    if (!packageData) return;
+    if (isDownloadProtectionEnabled() && !isSessionUnlocked()) {
+      setSecurityModalTargetName(file.name);
+      setSecurityModalMode('verify');
+      setPendingDownloadAction(() => () => executeDownloadSingleFile(file));
+      setShowSecurityModal(true);
+      return;
+    }
+    executeDownloadSingleFile(file);
   };
 
   const handleCopyCode = (fileId: string, content?: string) => {
@@ -413,6 +459,24 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Owner Security Settings Button */}
+          <button
+            onClick={() => {
+              setSecurityModalTargetName('');
+              setSecurityModalMode(isSessionUnlocked() ? 'settings' : 'verify');
+              setPendingDownloadAction(null);
+              setShowSecurityModal(true);
+            }}
+            className={`p-1.5 rounded-lg border text-xs font-mono transition flex items-center gap-1 ${
+              isSessionUnlocked()
+                ? 'bg-emerald-950/80 border-emerald-700 text-emerald-300'
+                : 'bg-slate-800 border-slate-700 text-slate-300'
+            }`}
+            title="Owner Security Controls: Change Code or Disable Protection"
+          >
+            {isSessionUnlocked() ? <Unlock className="w-4 h-4 text-emerald-400" /> : <Lock className="w-4 h-4 text-amber-400" />}
+          </button>
+
           {/* Khan Kaif Protocol Badge */}
           <button
             onClick={() => setShowProtocolModal(true)}
@@ -615,6 +679,20 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
                         </div>
 
                         <div className="flex items-center gap-2 shrink-0">
+                          {packageData.files.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadSingleFile(file);
+                              }}
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 border border-emerald-500/40 text-[11px] font-mono font-bold transition shadow-xs"
+                              title={`Download '${file.name}' directly`}
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Save</span>
+                            </button>
+                          )}
                           <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border ${
                             packageData.isBypassActive
                               ? 'text-emerald-400 border-emerald-800/60 bg-emerald-950/40'
@@ -770,6 +848,23 @@ export const MobileReceiverView: React.FC<MobileReceiverViewProps> = ({
         isBypassActive={activeBypassState}
         onToggleBypass={(v) => setActiveBypassState(v)}
         stagedFiles={packageData?.files as any || []}
+      />
+
+      {/* Download Passcode Authorization & Owner Security Settings Modal */}
+      <SecurityManagerModal
+        isOpen={showSecurityModal}
+        onClose={() => {
+          setShowSecurityModal(false);
+          setPendingDownloadAction(null);
+        }}
+        targetDownloadName={securityModalTargetName}
+        initialMode={securityModalMode}
+        onAuthorized={() => {
+          if (pendingDownloadAction) {
+            pendingDownloadAction();
+            setPendingDownloadAction(null);
+          }
+        }}
       />
     </div>
   );

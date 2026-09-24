@@ -32,7 +32,7 @@ export const WatermarkDashboard: React.FC<WatermarkDashboardProps> = ({
     if (!trimmed) {
       setFeedback({
         type: 'error',
-        message: 'Please enter the authorization clearance code ("BuildWithKMKaif") or secret developer key ("KaifOmniMind447").'
+        message: 'Please enter your authorization clearance code.'
       });
       return;
     }
@@ -59,7 +59,7 @@ export const WatermarkDashboard: React.FC<WatermarkDashboardProps> = ({
     } else {
       setFeedback({
         type: 'error',
-        message: 'Invalid code: Clearance key does not match. Secret code is "BuildWithKMKaif" or developer code "KaifOmniMind447".'
+        message: 'Invalid code: Clearance key does not match. Please verify with the owner.'
       });
     }
   };
